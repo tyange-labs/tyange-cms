@@ -67,6 +67,13 @@ export interface PortfolioResponse {
   updated_at: string
 }
 
+export type PortfolioSectionKey = 'meta' | 'identity' | 'intro' | 'featured_projects' | 'career'
+
+export interface UpdatePortfolioSectionResponse {
+  section_key: string
+  updated_at: string
+}
+
 export function normalizePortfolioDocument(document?: PortfolioDocument | null): PortfolioDocument | null {
   if (!document) {
     return null

@@ -7,7 +7,8 @@ import type {
   PortfolioLink,
   PortfolioProject,
   PortfolioResponse,
-  PortfolioTechStackItem,
+  PortfolioSectionKey,
+  UpdatePortfolioSectionResponse,
 } from '~/types/portfolio.types'
 import type { CMSResponse } from '~/types/response.types'
 import { handleUnauthorizedError, useAuthHeaders } from '~/composables/useAuthenticatedApi'
@@ -16,6 +17,7 @@ import { normalizePortfolioDocument } from '~/types/portfolio.types'
 const authHeaders = useAuthHeaders()
 
 const isSaving = ref(false)
+const savingSection = ref<PortfolioSectionKey | null>(null)
 const isDeleting = ref(false)
 const submitError = ref('')
 const successMessage = ref('')
@@ -346,6 +348,62 @@ async function handleSave() {
   }
 }
 
+const sectionLabels: Record<PortfolioSectionKey, string> = {
+  meta: 'Basic',
+  identity: 'Contact',
+  intro: 'Intro',
+  featured_projects: 'Featured Projects',
+  career: 'Career',
+}
+
+function buildSectionContent(sectionKey: PortfolioSectionKey) {
+  const p = portfolio.value
+  if (!p) {
+    throw new Error('포트폴리오가 초기화되지 않았습니다.')
+  }
+
+  switch (sectionKey) {
+    case 'meta':
+      return { slug: p.slug.trim() || 'dev', version: p.version ?? 1 }
+    case 'identity':
+      return p.identity
+    case 'intro':
+      return p.intro ?? { content: '', tech_stack: [] }
+    case 'featured_projects':
+      return p.featured_projects
+    case 'career':
+      return p.career ?? { summary_label: '', summary_value: '', companies: [] }
+  }
+}
+
+async function handleSaveSection(sectionKey: PortfolioSectionKey) {
+  submitError.value = ''
+  successMessage.value = ''
+  savingSection.value = sectionKey
+
+  try {
+    const response = await authenticatedFetch<CMSResponse<UpdatePortfolioSectionResponse>>(
+      `/api/portfolio/sections/${sectionKey}`,
+      {
+        method: 'PUT',
+        body: { content: buildSectionContent(sectionKey) },
+      },
+    )
+
+    if (response.data?.updated_at) {
+      updatedAt.value = response.data.updated_at
+    }
+
+    successMessage.value = `${sectionLabels[sectionKey]} 섹션을 저장했습니다.`
+  }
+  catch (error: unknown) {
+    submitError.value = getErrorMessage(error, `${sectionLabels[sectionKey]} 섹션 저장에 실패했습니다.`)
+  }
+  finally {
+    savingSection.value = null
+  }
+}
+
 async function handleDelete() {
   if (!hasPortfolio.value) {
     return
@@ -386,7 +444,7 @@ async function handleDelete() {
           Portfolio Editor
         </h1>
         <p class="text-sm text-muted">
-          `/portfolio` 단일 문서를 조회하고 생성, 수정, 삭제할 수 있습니다.
+          포트폴리오를 섹션(Basic / Contact / Intro / Featured Projects / Career) 단위로 조회하고 저장할 수 있습니다.
         </p>
       </div>
 
@@ -395,8 +453,8 @@ async function handleDelete() {
           새로고침
         </UButton>
         <template v-if="portfolio">
-          <UButton color="primary" icon="i-lucide-save" :loading="isSaving" @click="handleSave">
-            {{ hasPortfolio ? '저장' : '생성' }}
+          <UButton v-if="!hasPortfolio" color="primary" icon="i-lucide-save" :loading="isSaving" @click="handleSave">
+            생성
           </UButton>
           <UButton
             color="error"
@@ -481,9 +539,20 @@ async function handleDelete() {
 
       <UCard>
         <template #header>
-          <h2 class="font-semibold">
-            Basic
-          </h2>
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="font-semibold">
+              Basic
+            </h2>
+            <UButton
+              v-if="hasPortfolio"
+              size="sm"
+              icon="i-lucide-save"
+              :loading="savingSection === 'meta'"
+              @click="handleSaveSection('meta')"
+            >
+              저장
+            </UButton>
+          </div>
         </template>
 
         <div class="grid gap-4 sm:grid-cols-2">
@@ -499,9 +568,20 @@ async function handleDelete() {
 
       <UCard>
         <template #header>
-          <h2 class="font-semibold">
-            Contact
-          </h2>
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="font-semibold">
+              Contact
+            </h2>
+            <UButton
+              v-if="hasPortfolio"
+              size="sm"
+              icon="i-lucide-save"
+              :loading="savingSection === 'identity'"
+              @click="handleSaveSection('identity')"
+            >
+              저장
+            </UButton>
+          </div>
         </template>
 
         <div class="grid gap-4 sm:grid-cols-2">
@@ -521,9 +601,20 @@ async function handleDelete() {
 
       <UCard>
         <template #header>
-          <h2 class="font-semibold">
-            Intro
-          </h2>
+          <div class="flex items-center justify-between gap-3">
+            <h2 class="font-semibold">
+              Intro
+            </h2>
+            <UButton
+              v-if="hasPortfolio"
+              size="sm"
+              icon="i-lucide-save"
+              :loading="savingSection === 'intro'"
+              @click="handleSaveSection('intro')"
+            >
+              저장
+            </UButton>
+          </div>
         </template>
 
         <div class="space-y-6">
@@ -599,9 +690,20 @@ async function handleDelete() {
             <h2 class="font-semibold">
               Featured Projects
             </h2>
-            <UButton size="sm" variant="subtle" icon="i-lucide-plus" @click="addProject">
-              프로젝트 추가
-            </UButton>
+            <div class="flex items-center gap-2">
+              <UButton size="sm" variant="subtle" icon="i-lucide-plus" @click="addProject">
+                프로젝트 추가
+              </UButton>
+              <UButton
+                v-if="hasPortfolio"
+                size="sm"
+                icon="i-lucide-save"
+                :loading="savingSection === 'featured_projects'"
+                @click="handleSaveSection('featured_projects')"
+              >
+                저장
+              </UButton>
+            </div>
           </div>
         </template>
 
@@ -688,9 +790,20 @@ async function handleDelete() {
             <h2 class="font-semibold">
               Career
             </h2>
-            <UButton size="sm" variant="subtle" icon="i-lucide-plus" @click="addCareerCompany">
-              회사 추가
-            </UButton>
+            <div class="flex items-center gap-2">
+              <UButton size="sm" variant="subtle" icon="i-lucide-plus" @click="addCareerCompany">
+                회사 추가
+              </UButton>
+              <UButton
+                v-if="hasPortfolio"
+                size="sm"
+                icon="i-lucide-save"
+                :loading="savingSection === 'career'"
+                @click="handleSaveSection('career')"
+              >
+                저장
+              </UButton>
+            </div>
           </div>
         </template>
 
