@@ -24,7 +24,6 @@ export default defineNuxtConfig({
     public: {
       tyangeCmsApiBase: '',
       tyangeCmsApiBaseProd: '',
-      googleClientId: '',
     },
   },
   devServer: {

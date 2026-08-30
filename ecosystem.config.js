@@ -12,7 +12,6 @@ module.exports = {
       NITRO_HOST: '0.0.0.0',
       NUXT_PUBLIC_TYANGE_CMS_API_BASE: process.env.NUXT_PUBLIC_TYANGE_CMS_API_BASE || 'http://localhost:8080',
       NUXT_PUBLIC_TYANGE_CMS_API_BASE_PROD: process.env.NUXT_PUBLIC_TYANGE_CMS_API_BASE_PROD || '',
-      NUXT_PUBLIC_GOOGLE_CLIENT_ID: process.env.NUXT_PUBLIC_GOOGLE_CLIENT_ID || '',
     },
     time: true,
     merge_logs: true,

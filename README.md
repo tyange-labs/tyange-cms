@@ -11,7 +11,7 @@
 
 ## 현재 제공 기능
 
-- 관리자 로그인 (로컬 비밀번호 + Google OAuth)
+- 관리자 로그인 (ID / 비밀번호)
 - 블로그 포스트 목록 조회/등록/수정/삭제
 - 마크다운 / 리치 텍스트 이중 에디터 (포스트 성격별 선택)
 - 포스트 이미지 업로드 (클라이언트 압축 + 서버 업로드)
@@ -35,7 +35,6 @@
 
 ```env
 NUXT_PUBLIC_TYANGE_CMS_API_BASE=https://api.example.com
-NUXT_PUBLIC_GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
 ```
 
 ## 개발
@@ -58,6 +57,6 @@ Playwright 기반 E2E 테스트가 `tests/` 디렉터리에 정의되어 있습�
 - **Nuxt 4 + `@nuxt/ui` 4 + Tailwind 4 마이그레이션**: 2026-02 Vue 생태계의 최신 라인업으로 일괄 상향 — 세 가지가 서로 전제로 삼는 변경이라 한 번에 처리했다.
 - **에디터 이중화**: 기술 글은 마크다운 원문이 중요하고(`md-editor-v3`), 포트폴리오·공지성 글은 WYSIWYG이 편해서 리치 텍스트(`nuxt-tiptap-editor`)도 둔다.
 - **Bun 런타임**: 설치 속도와 lockfile 일관성 확보 목적. Nuxt 4는 `bun --bun run ...` 으로 실행.
-- **인증 저장 구조**: Pinia 스토어 + `pinia-plugin-persistedstate`로 JWT/Google 토큰을 localStorage에 영속, 페이지 리로드 시 상태 복원.
+- **인증 저장 구조**: Pinia 스토어 + `pinia-plugin-persistedstate`로 JWT를 localStorage에 영속, 페이지 리로드 시 상태 복원.
 - **포트폴리오 섹션별 저장**: 한 번에 전체 문서를 PUT하는 방식에서, 섹션 키(`meta` / `identity` / `intro` / `featured_projects` / `career`)별 개별 업데이트(`PUT /portfolio/sections/:section_key`)로 전환 → 동시 편집 충돌 면적 축소 + 저장 크기 감소. 최초 생성 시에만 전체 문서 PUT을 사용.
 - **API 기능 축소 동기화**: `tyange-cms-api`에서 가계부(예산/소비), 1:1 매칭/메시지, RSS, API Key 인증이 제거됨에 따라 CMS도 포스트/포트폴리오/태그/이미지 운영에 집중.

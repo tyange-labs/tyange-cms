@@ -26,8 +26,15 @@ Authorization 헤더를 그대로 실어 cms-api의 `GET /admin/wedding/guests`�
   `Z`를 붙여 읽은 뒤 `Asia/Seoul`로 옮겨 표시한다.
 - 시간대별 집계는 데이터에 없는 칸도 0으로 보여준다. 비어 있는 시간대가 보여야 쓸모가 있다.
 
+## 로그인
+
+**ID / 비밀번호 하나뿐이다.** Google 로그인은 걷어냈다 — 화면, `/api/login/google` 프록시,
+`googleClientId` 런타임 설정, 배포 워크플로의 `NUXT_PUBLIC_GOOGLE_CLIENT_ID` 주입까지 전부.
+`tyange-cms-api` 쪽 `POST /login/google`은 아직 살아 있지만 CMS는 더 이상 호출하지 않는다.
+
 ## 현재 상태
 - 운영 중
 - 하객 명단 페이지 추가 (lovelog RSVP 조회)
+- Google 로그인 제거, ID/비밀번호 로그인만 사용
 - 포트폴리오 편집은 섹션별 저장(`PUT /portfolio/sections/:section_key`, 섹션 키: meta / identity / intro / featured_projects / career) 사용, 최초 생성만 전체 문서 PUT
 - API에서 가계부/1:1 매칭/RSS/API Key 인증 제거됨 — CMS는 포스트/포트폴리오/태그/이미지 운영에 집중

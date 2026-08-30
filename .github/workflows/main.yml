@@ -47,6 +47,5 @@ jobs:
             cd ${{ vars.DEPLOY_PATH }}
             export NUXT_PUBLIC_TYANGE_CMS_API_BASE='${{ vars.NUXT_PUBLIC_TYANGE_CMS_API_BASE }}'
             export NUXT_PUBLIC_TYANGE_CMS_API_BASE_PROD='${{ vars.NUXT_PUBLIC_TYANGE_CMS_API_BASE_PROD }}'
-            export NUXT_PUBLIC_GOOGLE_CLIENT_ID='${{ secrets.NUXT_PUBLIC_GOOGLE_CLIENT_ID }}'
             /home/ubuntu/.local/share/pnpm/pm2 startOrRestart ecosystem.config.js --update-env
             /home/ubuntu/.local/share/pnpm/pm2 save

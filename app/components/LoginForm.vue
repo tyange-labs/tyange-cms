@@ -4,175 +4,16 @@ import type { AuthResponse } from '~/types/response.types'
 const enteredId = ref('')
 const enteredPassword = ref('')
 const errorMessage = ref('')
-const googleButtonShell = ref<HTMLDivElement | null>(null)
-const googleButtonContainer = ref<HTMLDivElement | null>(null)
-const isPasswordSubmitting = ref(false)
-const isGoogleSubmitting = ref(false)
-const isGoogleReady = ref(false)
-const googleLoadError = ref('')
-const googleScriptLoaded = ref(false)
+const isSubmitting = ref(false)
 
-const config = useRuntimeConfig()
 const { completeAdminLogin, getLoginErrorMessage } = useAdminLogin()
-const googleClientId = computed(() => config.public.googleClientId?.trim() ?? '')
-
-const googleScriptSrc = 'https://accounts.google.com/gsi/client'
-
-let googleScriptPromise: Promise<void> | null = null
-let googleButtonResizeObserver: ResizeObserver | null = null
-
-function setErrorMessage(message: string) {
-  errorMessage.value = message
-}
-
-function getGoogleButtonWidth() {
-  const widthSource = googleButtonShell.value ?? googleButtonContainer.value
-
-  if (!widthSource) {
-    return 360
-  }
-
-  return Math.max(Math.floor(widthSource.clientWidth), 240)
-}
-
-function loadGoogleScript() {
-  if (typeof window === 'undefined') {
-    return Promise.reject(new Error('Google script can only be loaded in the browser.'))
-  }
-
-  if (window.google?.accounts?.id) {
-    googleScriptLoaded.value = true
-    return Promise.resolve()
-  }
-
-  if (googleScriptPromise) {
-    return googleScriptPromise
-  }
-
-  googleScriptPromise = new Promise((resolve, reject) => {
-    const existingScript = document.querySelector<HTMLScriptElement>(`script[src="${googleScriptSrc}"]`)
-
-    if (existingScript) {
-      existingScript.addEventListener('load', () => {
-        googleScriptLoaded.value = true
-        resolve()
-      }, { once: true })
-      existingScript.addEventListener('error', () => {
-        reject(new Error('Google 로그인 스크립트를 불러오지 못했습니다.'))
-      }, { once: true })
-      return
-    }
-
-    const script = document.createElement('script')
-    script.src = googleScriptSrc
-    script.async = true
-    script.defer = true
-    script.onload = () => {
-      googleScriptLoaded.value = true
-      resolve()
-    }
-    script.onerror = () => {
-      reject(new Error('Google 로그인 스크립트를 불러오지 못했습니다.'))
-    }
-    document.head.appendChild(script)
-  })
-
-  return googleScriptPromise
-}
-
-function renderGoogleButton() {
-  if (!window.google?.accounts?.id || !googleButtonContainer.value || !googleClientId.value) {
-    return
-  }
-
-  googleButtonContainer.value.innerHTML = ''
-  window.google.accounts.id.initialize({
-    client_id: googleClientId.value,
-    callback: async ({ credential }) => {
-      if (!credential || isGoogleSubmitting.value) {
-        return
-      }
-
-      await submitLogin('google', async () => {
-        return await $fetch<AuthResponse>('/api/login/google', {
-          method: 'POST',
-          body: {
-            id_token: credential,
-          },
-          credentials: 'include',
-        })
-      })
-    },
-  })
-
-  window.google.accounts.id.renderButton(googleButtonContainer.value, {
-    theme: 'outline',
-    size: 'large',
-    text: 'signin_with',
-    shape: 'pill',
-    logo_alignment: 'left',
-    width: getGoogleButtonWidth(),
-  })
-
-  isGoogleReady.value = true
-}
-
-async function setupGoogleLogin() {
-  if (!googleClientId.value) {
-    googleLoadError.value = 'Google 로그인 설정이 필요합니다.'
-    return
-  }
-
-  googleLoadError.value = ''
-  isGoogleReady.value = false
-
-  try {
-    await loadGoogleScript()
-    renderGoogleButton()
-  }
-  catch (error) {
-    console.error('[auth] failed to initialize google sign-in', error)
-    googleLoadError.value = 'Google 로그인을 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.'
-  }
-}
-
-async function submitLogin(provider: 'password' | 'google', request: () => Promise<AuthResponse>) {
-  setErrorMessage('')
-
-  if (provider === 'password') {
-    isPasswordSubmitting.value = true
-  }
-  else {
-    isGoogleSubmitting.value = true
-  }
-
-  try {
-    const response = await request()
-    console.warn(`[auth] ${provider} login succeeded`, { userRole: response.user_role })
-
-    const result = await completeAdminLogin(response)
-
-    if (!result.ok) {
-      setErrorMessage(result.message)
-    }
-  }
-  catch (error) {
-    console.error(`[auth] ${provider} login failed`, error)
-    setErrorMessage(getLoginErrorMessage(error))
-  }
-  finally {
-    if (provider === 'password') {
-      isPasswordSubmitting.value = false
-    }
-    else {
-      isGoogleSubmitting.value = false
-    }
-  }
-}
 
 async function handleSubmit() {
-  await submitLogin('password', async () => {
-    return await $fetch<AuthResponse>('/api/login', {
+  errorMessage.value = ''
+  isSubmitting.value = true
+
+  try {
+    const response = await $fetch<AuthResponse>('/api/login', {
       method: 'POST',
       body: {
         user_id: enteredId.value,
@@ -180,26 +21,23 @@ async function handleSubmit() {
       },
       credentials: 'include',
     })
-  })
-}
 
-onMounted(async () => {
-  await setupGoogleLogin()
-  window.addEventListener('resize', renderGoogleButton)
+    console.warn('[auth] password login succeeded', { userRole: response.user_role })
 
-  if (typeof ResizeObserver !== 'undefined' && googleButtonShell.value) {
-    googleButtonResizeObserver = new ResizeObserver(() => {
-      renderGoogleButton()
-    })
-    googleButtonResizeObserver.observe(googleButtonShell.value)
+    const result = await completeAdminLogin(response)
+
+    if (!result.ok) {
+      errorMessage.value = result.message
+    }
   }
-})
-
-onBeforeUnmount(() => {
-  window.removeEventListener('resize', renderGoogleButton)
-  googleButtonResizeObserver?.disconnect()
-  window.google?.accounts?.id.cancel()
-})
+  catch (error) {
+    console.error('[auth] password login failed', error)
+    errorMessage.value = getLoginErrorMessage(error)
+  }
+  finally {
+    isSubmitting.value = false
+  }
+}
 </script>
 
 <template>
@@ -216,7 +54,7 @@ onBeforeUnmount(() => {
               운영 권한이 있는 관리자만 접근할 수 있습니다.
             </h1>
             <p class="max-w-md text-sm leading-6 text-white/70">
-              블로그 운영과 내부 업무를 다루는 전용 관리 화면입니다. Google 계정 또는 기존 관리자 계정으로 로그인해 주세요.
+              블로그 운영과 내부 업무를 다루는 전용 관리 화면입니다. 관리자 계정으로 로그인해 주세요.
             </p>
           </div>
         </div>
@@ -224,9 +62,6 @@ onBeforeUnmount(() => {
         <div class="grid gap-3 text-sm text-white/65">
           <div class="rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
             Admin role 검증 후에만 세션이 저장됩니다.
-          </div>
-          <div class="rounded-2xl border border-white/10 bg-black/10 px-4 py-3">
-            Google 로그인과 ID/비밀번호 로그인 모두 동일한 권한 정책을 적용합니다.
           </div>
         </div>
       </div>
@@ -251,16 +86,29 @@ onBeforeUnmount(() => {
             Sign in
           </h2>
           <p class="text-sm leading-6 text-white/60">
-            Google 계정 또는 기존 관리자 자격 증명으로 접속해 주세요.
+            관리자 자격 증명으로 접속해 주세요.
           </p>
         </div>
 
         <UForm class="space-y-5" @submit="handleSubmit">
           <UFormField label="ID" name="id" class="text-white/80">
-            <UInput v-model="enteredId" :disabled="isPasswordSubmitting || isGoogleSubmitting" size="xl" class="w-full" />
+            <UInput
+              v-model="enteredId"
+              :disabled="isSubmitting"
+              autocomplete="username"
+              size="xl"
+              class="w-full"
+            />
           </UFormField>
           <UFormField label="Password" name="password" class="text-white/80">
-            <UInput v-model="enteredPassword" type="password" :disabled="isPasswordSubmitting || isGoogleSubmitting" size="xl" class="w-full" />
+            <UInput
+              v-model="enteredPassword"
+              type="password"
+              :disabled="isSubmitting"
+              autocomplete="current-password"
+              size="xl"
+              class="w-full"
+            />
           </UFormField>
           <UButton
             type="submit"
@@ -268,43 +116,11 @@ onBeforeUnmount(() => {
             size="xl"
             color="primary"
             class="mt-2 h-14 justify-center rounded-2xl font-semibold"
-            :loading="isPasswordSubmitting"
-            :disabled="isGoogleSubmitting"
+            :loading="isSubmitting"
           >
             로그인
           </UButton>
         </UForm>
-
-        <div class="space-y-4">
-          <div class="flex items-center gap-4 text-[11px] font-medium uppercase tracking-[0.2em] text-white/35">
-            <div class="h-px flex-1 bg-white/10" />
-            <span>Google</span>
-            <div class="h-px flex-1 bg-white/10" />
-          </div>
-
-          <div class="space-y-3">
-            <div ref="googleButtonShell" class="google-button-shell relative mx-auto min-h-14 w-full max-w-[400px]">
-              <div
-                class="transition-opacity"
-                :class="[
-                  isGoogleReady && !isGoogleSubmitting ? 'opacity-100' : 'pointer-events-none opacity-0',
-                ]"
-              >
-                <div ref="googleButtonContainer" class="google-button-container min-h-14 w-full" />
-              </div>
-              <div
-                v-if="!isGoogleReady || isGoogleSubmitting"
-                class="absolute inset-0 flex items-center justify-center rounded-[22px] border border-white/10 bg-[#081427] text-sm font-medium text-white/72"
-              >
-                {{ isGoogleSubmitting ? 'Google 로그인 처리 중...' : 'Google 로그인 준비 중...' }}
-              </div>
-            </div>
-
-            <p v-if="googleLoadError" class="text-sm text-amber-300">
-              {{ googleLoadError }}
-            </p>
-          </div>
-        </div>
 
         <div class="min-h-6">
           <p v-if="errorMessage" class="rounded-2xl border border-red-400/20 bg-red-500/10 px-4 py-3 text-sm text-red-200">
@@ -320,20 +136,4 @@ onBeforeUnmount(() => {
   </section>
 </template>
 
-<style scoped>
-.google-button-shell {
-  overflow: hidden;
-  border-radius: 22px;
-}
-
-.google-button-container {
-  overflow: hidden;
-  border-radius: 22px;
-}
-
-.google-button-container :deep(> div),
-.google-button-container :deep(iframe) {
-  display: block;
-  max-width: 100%;
-}
-</style>
+<style scoped></style>
