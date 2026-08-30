@@ -24,6 +24,11 @@ const items = computed<NavigationMenuItem[]>(() =>
           to: '/portfolio',
           active: route.path === '/portfolio',
         },
+        {
+          label: '하객 명단',
+          to: '/wedding-guests',
+          active: route.path === '/wedding-guests',
+        },
       ]
     : [],
 
