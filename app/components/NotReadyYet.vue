@@ -7,12 +7,8 @@ import { Clock } from 'lucide-vue-next'
     <div>
       <Clock :size="50" />
     </div>
-    <h1>
-      아직 준비 중입니다
-    </h1>
+    <h1>아직 준비 중입니다</h1>
   </div>
 </template>
 
-<style scoped>
-
-</style>
+<style scoped></style>

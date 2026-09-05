@@ -17,11 +17,9 @@ async function handleLogout() {
 
 <template>
   <div class="flex min-h-screen items-center justify-center px-6">
-    <UCard class="w-full max-w-lg">
+    <UiCard class="w-full max-w-lg">
       <template #header>
-        <h1 class="text-lg font-semibold">
-          관리자 전용 CMS입니다
-        </h1>
+        <h1 class="text-lg font-semibold">관리자 전용 CMS입니다</h1>
       </template>
 
       <div class="space-y-4">
@@ -32,17 +30,14 @@ async function handleLogout() {
           현재 응답된 역할은 <strong>{{ deniedRole }}</strong> 입니다.
         </p>
         <p class="text-sm text-muted">
-          관리자 계정으로 다시 로그인해 주세요. 개인 예산/소비 확인은 `tyange-dashboard`에서 처리하는 구조입니다.
+          관리자 계정으로 다시 로그인해 주세요. 개인 예산/소비 확인은 `tyange-dashboard`에서
+          처리하는 구조입니다.
         </p>
         <div class="flex gap-2">
-          <UButton color="neutral" variant="soft" @click="handleLogout">
-            로그아웃
-          </UButton>
-          <UButton to="/">
-            로그인으로 이동
-          </UButton>
+          <UiButton color="neutral" variant="soft" @click="handleLogout"> 로그아웃 </UiButton>
+          <UiButton to="/"> 로그인으로 이동 </UiButton>
         </div>
       </div>
-    </UCard>
+    </UiCard>
   </div>
 </template>

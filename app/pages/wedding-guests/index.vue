@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { CMSResponse } from '~/types/response.types'
 import type { WeddingGuest, WeddingGuestListResponse } from '~/types/wedding.types'
+import { RefreshCw, Users } from 'lucide-vue-next'
 import { handleUnauthorizedError, useAuthHeaders } from '~/composables/useAuthenticatedApi'
 
 definePageMeta({
@@ -33,7 +34,12 @@ function getErrorMessage(error: unknown, fallback: string) {
     return fetchError.data
   }
 
-  if (fetchError?.data && typeof fetchError.data === 'object' && 'message' in fetchError.data && typeof fetchError.data.message === 'string') {
+  if (
+    fetchError?.data &&
+    typeof fetchError.data === 'object' &&
+    'message' in fetchError.data &&
+    typeof fetchError.data.message === 'string'
+  ) {
     return fetchError.data.message
   }
 
@@ -80,23 +86,32 @@ function formatReceivedAt(createdAt: string) {
   return seoulFormatter.format(parsed)
 }
 
-const { data, refresh, status, error } = await useFetch<CMSResponse<WeddingGuestListResponse>>('/api/wedding-guests', {
-  headers: authHeaders,
-  credentials: 'include',
-  server: false,
-})
+const { data, refresh, status, error } = await useFetch<CMSResponse<WeddingGuestListResponse>>(
+  '/api/wedding-guests',
+  {
+    headers: authHeaders,
+    credentials: 'include',
+    server: false,
+  },
+)
 
-watch(error, async (value) => {
-  if (value) {
-    await handleUnauthorizedError(value)
-  }
-}, { immediate: true })
+watch(
+  error,
+  async (value) => {
+    if (value) {
+      await handleUnauthorizedError(value)
+    }
+  },
+  { immediate: true },
+)
 
 const guests = computed(() => data.value?.data?.guests ?? [])
 const totalGuests = computed(() => data.value?.data?.total_guests ?? 0)
 const totalAttendees = computed(() => data.value?.data?.total_attendees ?? 0)
 const isLoading = computed(() => status.value === 'pending')
-const loadErrorMessage = computed(() => error.value ? getErrorMessage(error.value, '하객 명단을 불러오지 못했습니다.') : '')
+const loadErrorMessage = computed(() =>
+  error.value ? getErrorMessage(error.value, '하객 명단을 불러오지 못했습니다.') : '',
+)
 
 // 예상 밖의 시간대가 저장돼 있어도 조용히 사라지지 않도록 데이터에 있는 시각을 함께 모은다.
 const breakdown = computed(() => {
@@ -108,18 +123,20 @@ const breakdown = computed(() => {
     }
   }
 
-  const rows = [...hours].sort((a, b) => a - b).map((hour) => {
-    const matched = guests.value.filter(guest => guest.visit_hour === hour)
+  const rows = [...hours]
+    .sort((a, b) => a - b)
+    .map((hour) => {
+      const matched = guests.value.filter((guest) => guest.visit_hour === hour)
 
-    return {
-      key: String(hour),
-      label: visitHourLabel(hour),
-      groups: matched.length,
-      attendees: matched.reduce((sum, guest) => sum + headCount(guest), 0),
-    }
-  })
+      return {
+        key: String(hour),
+        label: visitHourLabel(hour),
+        groups: matched.length,
+        attendees: matched.reduce((sum, guest) => sum + headCount(guest), 0),
+      }
+    })
 
-  const undecided = guests.value.filter(guest => guest.visit_hour === null)
+  const undecided = guests.value.filter((guest) => guest.visit_hour === null)
 
   if (undecided.length > 0) {
     rows.push({
@@ -148,7 +165,7 @@ function barWidth(attendees: number) {
 
 <template>
   <div data-testid="wedding-guests-page" class="space-y-6">
-    <UAlert
+    <UiAlert
       v-if="loadErrorMessage"
       color="error"
       variant="subtle"
@@ -158,51 +175,35 @@ function barWidth(attendees: number) {
 
     <template v-if="isLoading">
       <div class="grid grid-cols-2 gap-3">
-        <USkeleton v-for="i in 2" :key="i" class="h-20" />
+        <UiSkeleton v-for="i in 2" :key="i" class="h-20" />
       </div>
-      <USkeleton class="h-40" />
-      <UCard v-for="i in 4" :key="i">
+      <UiSkeleton class="h-40" />
+      <UiCard v-for="i in 4" :key="i">
         <div class="space-y-2">
-          <USkeleton class="h-5 w-1/3" />
-          <USkeleton class="h-4 w-1/2" />
+          <UiSkeleton class="h-5 w-1/3" />
+          <UiSkeleton class="h-4 w-1/2" />
         </div>
-      </UCard>
+      </UiCard>
     </template>
 
     <template v-else-if="!loadErrorMessage && guests.length > 0">
       <div class="grid grid-cols-2 gap-3">
-        <UCard>
-          <p class="text-sm text-muted">
-            신청 건수
-          </p>
-          <p class="text-2xl font-semibold">
-            {{ totalGuests }}건
-          </p>
-        </UCard>
-        <UCard>
-          <p class="text-sm text-muted">
-            총 인원 (동반 포함)
-          </p>
-          <p class="text-2xl font-semibold">
-            {{ totalAttendees }}명
-          </p>
-        </UCard>
+        <UiCard>
+          <p class="text-sm text-muted">신청 건수</p>
+          <p class="text-2xl font-semibold">{{ totalGuests }}건</p>
+        </UiCard>
+        <UiCard>
+          <p class="text-sm text-muted">총 인원 (동반 포함)</p>
+          <p class="text-2xl font-semibold">{{ totalAttendees }}명</p>
+        </UiCard>
       </div>
 
-      <UCard>
+      <UiCard>
         <div class="flex items-center justify-between gap-3">
-          <h2 class="font-semibold">
-            시간대별 인원
-          </h2>
-          <UButton
-            color="neutral"
-            variant="ghost"
-            icon="i-lucide-refresh-cw"
-            size="sm"
-            @click="refresh()"
-          >
+          <h2 class="font-semibold">시간대별 인원</h2>
+          <UiButton color="neutral" variant="ghost" :icon="RefreshCw" size="sm" @click="refresh()">
             새로고침
-          </UButton>
+          </UiButton>
         </div>
 
         <ul class="mt-4 space-y-3">
@@ -212,49 +213,48 @@ function barWidth(attendees: number) {
               <span class="text-muted">{{ row.attendees }}명 · {{ row.groups }}건</span>
             </div>
             <div class="h-2 rounded-full bg-elevated">
-              <div class="h-2 rounded-full bg-primary" :style="{ width: barWidth(row.attendees) }" />
+              <div
+                class="h-2 rounded-full bg-primary"
+                :style="{ width: barWidth(row.attendees) }"
+              />
             </div>
           </li>
         </ul>
-      </UCard>
+      </UiCard>
 
       <div class="space-y-3">
-        <h2 class="font-semibold">
-          명단
-        </h2>
-        <UCard
+        <h2 class="font-semibold">명단</h2>
+        <UiCard
           v-for="guest in guests"
           :key="guest.guest_id"
-          :ui="{ body: 'flex items-center justify-between gap-4' }"
+          body-class="flex items-center justify-between gap-4"
         >
           <div class="min-w-0 space-y-1">
             <p class="font-semibold truncate">
               {{ guest.name }}
             </p>
-            <p class="text-xs text-muted">
-              {{ formatReceivedAt(guest.created_at) }} 접수
-            </p>
+            <p class="text-xs text-muted">{{ formatReceivedAt(guest.created_at) }} 접수</p>
           </div>
 
           <div class="flex shrink-0 items-center gap-2">
-            <UBadge v-if="guest.companions > 0" variant="subtle" size="sm">
+            <UiBadge v-if="guest.companions > 0" variant="subtle" size="sm">
               외 {{ guest.companions }}명
-            </UBadge>
-            <UBadge
+            </UiBadge>
+            <UiBadge
               :variant="guest.visit_hour === null ? 'outline' : 'solid'"
               :color="guest.visit_hour === null ? 'neutral' : 'primary'"
               size="sm"
             >
               {{ guest.visit_hour === null ? '시간 미정' : visitHourLabel(guest.visit_hour) }}
-            </UBadge>
+            </UiBadge>
           </div>
-        </UCard>
+        </UiCard>
       </div>
     </template>
 
-    <UEmpty
+    <UiEmptyState
       v-else-if="!loadErrorMessage"
-      icon="i-lucide-users"
+      :icon="Users"
       label="아직 접수된 하객이 없습니다."
     />
   </div>

@@ -10,11 +10,8 @@ export default defineEventHandler(async (event) => {
     headers.append('Authorization', authHeader)
   }
 
-  return await $fetch(
-    `${config.public.tyangeCmsApiBase}/post/delete/${postId}`,
-    {
-      method: 'DELETE',
-      headers,
-    },
-  )
+  return await $fetch(`${config.public.tyangeCmsApiBase}/post/delete/${postId}`, {
+    method: 'DELETE',
+    headers,
+  })
 })

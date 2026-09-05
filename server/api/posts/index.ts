@@ -8,10 +8,7 @@ export default defineEventHandler(async (event) => {
     headers.append('Authorization', authHeader)
   }
 
-  return await $fetch(
-    `${config.public.tyangeCmsApiBase}/admin/posts`,
-    {
-      headers,
-    },
-  )
+  return await $fetch(`${config.public.tyangeCmsApiBase}/admin/posts`, {
+    headers,
+  })
 })

@@ -74,7 +74,9 @@ export interface UpdatePortfolioSectionResponse {
   updated_at: string
 }
 
-export function normalizePortfolioDocument(document?: PortfolioDocument | null): PortfolioDocument | null {
+export function normalizePortfolioDocument(
+  document?: PortfolioDocument | null,
+): PortfolioDocument | null {
   if (!document) {
     return null
   }
@@ -87,19 +89,19 @@ export function normalizePortfolioDocument(document?: PortfolioDocument | null):
       email: document.identity?.email ?? '',
       github_url: document.identity?.github_url ?? '',
     },
-    featured_projects: (document.featured_projects ?? []).map(project => ({
+    featured_projects: (document.featured_projects ?? []).map((project) => ({
       ...project,
       stack: [...(project.stack ?? [])],
       highlights: [...(project.highlights ?? [])],
-      links: (project.links ?? []).map(link => ({ ...link })),
+      links: (project.links ?? []).map((link) => ({ ...link })),
     })),
     career: document.career
       ? {
           summary_label: document.career.summary_label ?? '',
           summary_value: document.career.summary_value ?? '',
-          companies: (document.career.companies ?? []).map(company => ({
+          companies: (document.career.companies ?? []).map((company) => ({
             ...company,
-            items: (company.items ?? []).map(item => ({
+            items: (company.items ?? []).map((item) => ({
               ...item,
               bullets: [...(item.bullets ?? [])],
             })),
@@ -109,7 +111,7 @@ export function normalizePortfolioDocument(document?: PortfolioDocument | null):
     intro: document.intro
       ? {
           content: document.intro.content ?? '',
-          tech_stack: (document.intro.tech_stack ?? []).map(item => ({ ...item })),
+          tech_stack: (document.intro.tech_stack ?? []).map((item) => ({ ...item })),
         }
       : undefined,
   }

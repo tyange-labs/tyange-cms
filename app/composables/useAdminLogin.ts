@@ -3,12 +3,12 @@ import type { AuthResponse } from '~/types/response.types'
 const ADMIN_ONLY_MESSAGE = '관리자만 로그인할 수 있습니다.'
 
 interface FetchLikeError {
-  data?: { message?: string, error?: string } | string
+  data?: { message?: string; error?: string } | string
   status?: number
   statusCode?: number
   statusMessage?: string
   response?: {
-    _data?: { message?: string, error?: string } | string
+    _data?: { message?: string; error?: string } | string
     status?: number
   }
   message?: string

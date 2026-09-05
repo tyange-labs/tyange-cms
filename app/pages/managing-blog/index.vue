@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { PostListItem } from '~/types/editor.types'
 import type { CMSResponse } from '~/types/response.types'
+import { Inbox, Trash } from 'lucide-vue-next'
 import { handleUnauthorizedError, useAuthHeaders } from '~/composables/useAuthenticatedApi'
 
 definePageMeta({
@@ -31,7 +32,12 @@ function getErrorMessage(error: unknown, fallback: string) {
     return fetchError.data
   }
 
-  if (fetchError?.data && typeof fetchError.data === 'object' && 'message' in fetchError.data && typeof fetchError.data.message === 'string') {
+  if (
+    fetchError?.data &&
+    typeof fetchError.data === 'object' &&
+    'message' in fetchError.data &&
+    typeof fetchError.data.message === 'string'
+  ) {
     return fetchError.data.message
   }
 
@@ -46,21 +52,30 @@ function getErrorMessage(error: unknown, fallback: string) {
   return fallback
 }
 
-const { data, refresh, status, error } = await useFetch<CMSResponse<{ posts: PostListItem[] }>>(`/api/posts`, {
-  headers: authHeaders,
-  credentials: 'include',
-  server: false,
-})
+const { data, refresh, status, error } = await useFetch<CMSResponse<{ posts: PostListItem[] }>>(
+  `/api/posts`,
+  {
+    headers: authHeaders,
+    credentials: 'include',
+    server: false,
+  },
+)
 
-watch(error, async (value) => {
-  if (value) {
-    await handleUnauthorizedError(value)
-  }
-}, { immediate: true })
+watch(
+  error,
+  async (value) => {
+    if (value) {
+      await handleUnauthorizedError(value)
+    }
+  },
+  { immediate: true },
+)
 
 const postList = computed(() => data.value?.data?.posts ?? [])
 const isLoading = computed(() => status.value === 'pending')
-const loadErrorMessage = computed(() => error.value ? getErrorMessage(error.value, '포스트 목록을 불러오지 못했습니다.') : '')
+const loadErrorMessage = computed(() =>
+  error.value ? getErrorMessage(error.value, '포스트 목록을 불러오지 못했습니다.') : '',
+)
 
 async function handleDeletePost(postId: string) {
   if (!authStore.accessToken) {
@@ -69,16 +84,18 @@ async function handleDeletePost(postId: string) {
   }
 
   try {
-    const res = await authenticatedFetch<CMSResponse<{ post_id: string }>>(`/api/post/delete?id=${postId}`, {
-      method: 'DELETE',
-    })
+    const res = await authenticatedFetch<CMSResponse<{ post_id: string }>>(
+      `/api/post/delete?id=${postId}`,
+      {
+        method: 'DELETE',
+      },
+    )
 
     if (res.status) {
       feedbackMessage.value = ''
       await refresh()
     }
-  }
-  catch (err: unknown) {
+  } catch (err: unknown) {
     feedbackMessage.value = getErrorMessage(err, '포스트 삭제에 실패했습니다.')
   }
 }
@@ -86,7 +103,7 @@ async function handleDeletePost(postId: string) {
 
 <template>
   <div class="space-y-3">
-    <UAlert
+    <UiAlert
       v-if="loadErrorMessage || feedbackMessage"
       color="error"
       variant="subtle"
@@ -95,28 +112,28 @@ async function handleDeletePost(postId: string) {
     />
 
     <template v-if="isLoading">
-      <UCard v-for="i in 5" :key="i">
+      <UiCard v-for="i in 5" :key="i">
         <div class="flex items-start justify-between gap-4">
           <div class="flex-1 space-y-2">
-            <USkeleton class="h-5 w-1/3" />
-            <USkeleton class="h-4 w-2/3" />
+            <UiSkeleton class="h-5 w-1/3" />
+            <UiSkeleton class="h-4 w-2/3" />
             <div class="flex gap-4">
-              <USkeleton class="h-3 w-24" />
-              <USkeleton class="h-3 w-24" />
+              <UiSkeleton class="h-3 w-24" />
+              <UiSkeleton class="h-3 w-24" />
             </div>
             <div class="flex gap-1">
-              <USkeleton v-for="j in 3" :key="j" class="h-5 w-12 rounded-full" />
+              <UiSkeleton v-for="j in 3" :key="j" class="h-5 w-12 rounded-full" />
             </div>
           </div>
-          <USkeleton class="h-8 w-8 rounded-md" />
+          <UiSkeleton class="h-8 w-8 rounded-md" />
         </div>
-      </UCard>
+      </UiCard>
     </template>
     <template v-else-if="!loadErrorMessage && postList.length > 0">
-      <UCard
+      <UiCard
         v-for="post in postList"
         :key="post.post_id"
-        :ui="{ body: 'flex items-start justify-between gap-4' }"
+        body-class="flex items-start justify-between gap-4"
       >
         <NuxtLink :to="`/managing-blog/update/${post.post_id}`" class="flex-1 min-w-0 space-y-2">
           <h2 class="font-semibold truncate">
@@ -130,31 +147,22 @@ async function handleDeletePost(postId: string) {
             <time>{{ post.published_at }}</time>
           </div>
           <div v-if="post.tags?.length" class="flex flex-wrap gap-1">
-            <UBadge
-              v-for="tag in post.tags"
-              :key="tag.tag"
-              variant="subtle"
-              size="sm"
-            >
+            <UiBadge v-for="tag in post.tags" :key="tag.tag" variant="subtle" size="sm">
               {{ tag.tag }}
-            </UBadge>
+            </UiBadge>
           </div>
         </NuxtLink>
 
-        <UButton
+        <UiButton
           color="error"
           variant="ghost"
-          icon="i-lucide-trash"
+          :icon="Trash"
           size="sm"
           @click.prevent="handleDeletePost(post.post_id)"
         />
-      </UCard>
+      </UiCard>
     </template>
 
-    <UEmpty
-      v-else-if="!loadErrorMessage"
-      icon="i-lucide-inbox"
-      label="No posts available"
-    />
+    <UiEmptyState v-else-if="!loadErrorMessage" :icon="Inbox" label="No posts available" />
   </div>
 </template>

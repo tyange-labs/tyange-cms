@@ -24,14 +24,20 @@ const styleProps = [
 type StyleProp = (typeof styleProps)[number]
 type StyleSnapshot = Record<StyleProp, string>
 
-async function readStyles(locator: Locator, properties: readonly StyleProp[]): Promise<StyleSnapshot> {
+async function readStyles(
+  locator: Locator,
+  properties: readonly StyleProp[],
+): Promise<StyleSnapshot> {
   return locator.evaluate((element: Element, props: readonly StyleProp[]) => {
     const computed = window.getComputedStyle(element)
 
-    return props.reduce((result, prop) => {
-      result[prop] = computed[prop]
-      return result
-    }, {} as Record<StyleProp, string>)
+    return props.reduce(
+      (result, prop) => {
+        result[prop] = computed[prop]
+        return result
+      },
+      {} as Record<StyleProp, string>,
+    )
   }, properties)
 }
 

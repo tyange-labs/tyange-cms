@@ -21,15 +21,17 @@ export default defineEventHandler(async (event) => {
   })
 
   try {
-    return await $fetch(`${config.public.tyangeCmsApiBase}/upload-image?image_type=portfolio_icon`, {
-      method: 'POST',
-      headers: {
-        Authorization: authHeader || '',
+    return await $fetch(
+      `${config.public.tyangeCmsApiBase}/upload-image?image_type=portfolio_icon`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: authHeader || '',
+        },
+        body: newFormData,
       },
-      body: newFormData,
-    })
-  }
-  catch (err: any) {
+    )
+  } catch (err: any) {
     const statusCode = err?.response?.status || err?.statusCode || 500
     const errorData = err?.response?._data || err?.data || err?.message || 'Unknown error'
 

@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import type { NavigationMenuItem } from '@nuxt/ui'
+import { LogOut } from 'lucide-vue-next'
+
+interface NavItem {
+  label: string
+  to: string
+  active: boolean
+}
 
 const route = useRoute()
 const authStore = useAuthStore()
 
 const isAdmin = computed(() => authStore.userRole === 'admin')
 
-const items = computed<NavigationMenuItem[]>(() =>
+const items = computed<NavItem[]>(() =>
   isAdmin.value
     ? [
         {
@@ -31,7 +37,6 @@ const items = computed<NavigationMenuItem[]>(() =>
         },
       ]
     : [],
-
 )
 
 async function handleLogout() {
@@ -41,28 +46,17 @@ async function handleLogout() {
 </script>
 
 <template>
-  <UHeader
-    data-testid="dashboard-header"
-    title="tyange-cms"
-    :ui="{
-      container: 'mx-auto flex h-full w-full max-w-3xl items-center justify-between gap-3 px-5',
-      header: 'h-(--ui-header-height) shrink-0 flex items-center justify-between gap-3',
-      body: 'px-5 py-4 overflow-y-auto',
-    }"
-  >
-    <UNavigationMenu v-if="items.length" :items="items" />
+  <UiHeader data-testid="dashboard-header" title="tyange-cms">
+    <UiNavMenu v-if="items.length" :items="items" />
     <template #right>
       <div data-testid="dashboard-header-actions" class="flex items-center gap-3">
         <span class="text-sm text-muted">{{ authStore.userRole ?? 'unknown' }}</span>
-        <UButton color="neutral" variant="ghost" icon="i-lucide-log-out" @click="handleLogout">
+        <UiButton color="neutral" variant="ghost" :icon="LogOut" @click="handleLogout">
           로그아웃
-        </UButton>
+        </UiButton>
       </div>
     </template>
-    <template #body>
-      <UNavigationMenu v-if="items.length" :items="items" orientation="vertical" class="-mx-2.5" />
-    </template>
-  </UHeader>
+  </UiHeader>
 </template>
 
 <style scoped></style>

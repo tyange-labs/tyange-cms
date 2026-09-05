@@ -1,5 +1,33 @@
 @import 'tailwindcss';
-@import '@nuxt/ui';
+
+/*
+ * @nuxt/ui가 제공하던 시맨틱 토큰을 필요한 만큼만 직접 정의한다.
+ * 값은 Nuxt UI 기본 팔레트(primary=green, neutral=slate)의 라이트 모드 매핑과 동일하게 맞췄다.
+ * 다크모드는 앱 어디에서도 쓰지 않아 라이트 팔레트 하나만 둔다.
+ */
+@theme {
+  --color-primary: var(--color-green-500);
+  --color-success: var(--color-green-500);
+  --color-warning: var(--color-yellow-500);
+  --color-error: var(--color-red-500);
+  --color-neutral: var(--color-slate-500);
+
+  --text-color-default: var(--color-slate-700);
+  --text-color-muted: var(--color-slate-500);
+  --background-color-default: #fff;
+  --background-color-elevated: var(--color-slate-100);
+  --border-color-default: var(--color-slate-200);
+}
+
+:root {
+  --header-height: 4rem;
+}
+
+@layer base {
+  body {
+    @apply antialiased text-default bg-default;
+  }
+}
 
 * {
   font-family: 'Asta Sans', sans-serif;

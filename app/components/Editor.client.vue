@@ -37,7 +37,11 @@ let queuedAutoSave = false
 let queuedNavigateAfterSave = false
 
 const initialDate = publishedAtProps.value
-  ? new CalendarDate(Number(publishedAtProps.value[0]), Number(publishedAtProps.value[1]), Number(publishedAtProps.value[2]))
+  ? new CalendarDate(
+      Number(publishedAtProps.value[0]),
+      Number(publishedAtProps.value[1]),
+      Number(publishedAtProps.value[2]),
+    )
   : new CalendarDate(getYear(currentDate), getMonth(currentDate) + 1, getDate(currentDate))
 
 const enteredPublishedAt = shallowRef(initialDate)
@@ -92,22 +96,13 @@ const tagsByCategory = computed(() => {
   return map
 })
 
-const inputMenuRefs = ref<Record<string, any>>({})
-
 function setTagsForCategory(category: string, selected: string[]) {
-  const otherTags = enteredTags.value.filter(t => t.category !== category)
-  const newTags = selected.map(tag => ({ tag, category }))
+  const otherTags = enteredTags.value.filter((t) => t.category !== category)
+  const newTags = selected.map((tag) => ({ tag, category }))
   enteredTags.value = [...otherTags, ...newTags]
-
-  nextTick(() => {
-    const inputEl = inputMenuRefs.value[category]?.inputRef
-    if (inputEl) {
-      inputEl.value = ''
-      inputEl.dispatchEvent(new Event('input'))
-    }
-  })
 }
-const { data: tagCategories } = await useFetch<CMSResponse<TagWithCategory[]>>('/api/tags-with-category')
+const { data: tagCategories } =
+  await useFetch<CMSResponse<TagWithCategory[]>>('/api/tags-with-category')
 
 function getErrorMessage(error: unknown, fallback: string) {
   const fetchError = error as {
@@ -128,7 +123,12 @@ function getErrorMessage(error: unknown, fallback: string) {
     return fetchError.data
   }
 
-  if (fetchError?.data && typeof fetchError.data === 'object' && 'message' in fetchError.data && typeof fetchError.data.message === 'string') {
+  if (
+    fetchError?.data &&
+    typeof fetchError.data === 'object' &&
+    'message' in fetchError.data &&
+    typeof fetchError.data.message === 'string'
+  ) {
     return fetchError.data.message
   }
 
@@ -160,10 +160,10 @@ function buildSnapshot() {
 
 function hasMeaningfulContent() {
   return Boolean(
-    enteredTitle.value.trim()
-    || enteredDescription.value.trim()
-    || enteredContent.value.trim()
-    || enteredTags.value.length,
+    enteredTitle.value.trim() ||
+    enteredDescription.value.trim() ||
+    enteredContent.value.trim() ||
+    enteredTags.value.length,
   )
 }
 
@@ -174,7 +174,7 @@ function clearAutoSaveTimer() {
   }
 }
 
-async function savePost(options?: { navigateOnSuccess?: boolean, isAutoSave?: boolean }) {
+async function savePost(options?: { navigateOnSuccess?: boolean; isAutoSave?: boolean }) {
   const navigateOnSuccess = options?.navigateOnSuccess ?? false
   const isAutoSaveRequest = options?.isAutoSave ?? false
 
@@ -214,19 +214,16 @@ async function savePost(options?: { navigateOnSuccess?: boolean, isAutoSave?: bo
     lastSavedAt.value = new Date()
     hasUnsavedChanges.value = false
 
-    if (res.status && navigateOnSuccess)
-      await navigateTo('/managing-blog')
+    if (res.status && navigateOnSuccess) await navigateTo('/managing-blog')
 
     return true
-  }
-  catch (err: unknown) {
+  } catch (err: unknown) {
     submitError.value = getErrorMessage(
       err,
       postId.value ? '포스트 수정에 실패했습니다.' : '포스트 생성에 실패했습니다.',
     )
     return false
-  }
-  finally {
+  } finally {
     isSaving.value = false
     isAutoSaving.value = false
 
@@ -240,8 +237,7 @@ async function savePost(options?: { navigateOnSuccess?: boolean, isAutoSave?: bo
           navigateOnSuccess: nextShouldNavigate,
           isAutoSave: !nextShouldNavigate,
         })
-      }
-      else if (nextShouldNavigate) {
+      } else if (nextShouldNavigate) {
         await navigateTo('/managing-blog')
       }
     }
@@ -284,18 +280,20 @@ async function handleUploadImage(files: Array<File>, callback: (urls: string[]) 
       const compressedFile = await imageCompression(file, { maxSizeMB: 2, useWebWorker: true })
       const formData = new FormData()
       formData.append('file', compressedFile)
-      const res = await authenticatedFetch<CMSResponse<{ image_path: string }>>(`/api/post/upload-image?id=${postId.value}`, {
-        method: 'POST',
-        body: formData,
-      })
+      const res = await authenticatedFetch<CMSResponse<{ image_path: string }>>(
+        `/api/post/upload-image?id=${postId.value}`,
+        {
+          method: 'POST',
+          body: formData,
+        },
+      )
       if (!res.data?.image_path) {
         throw new Error('이미지 업로드 응답이 비어 있습니다.')
       }
       results.push(`${config.public.tyangeCmsApiBaseProd}${res.data.image_path}`)
     }
     callback(results)
-  }
-  catch (error: unknown) {
+  } catch (error: unknown) {
     submitError.value = getErrorMessage(error, '이미지 업로드에 실패했습니다.')
   }
 }
@@ -322,14 +320,7 @@ function handleBeforeUnload(event: BeforeUnloadEvent) {
 }
 
 watch(
-  [
-    enteredTitle,
-    enteredDescription,
-    enteredPublishedAt,
-    enteredTags,
-    enteredContent,
-    status,
-  ],
+  [enteredTitle, enteredDescription, enteredPublishedAt, enteredTags, enteredContent, status],
   () => {
     const nextSnapshot = buildSnapshot()
     hasUnsavedChanges.value = nextSnapshot !== lastSavedSnapshot.value
@@ -357,7 +348,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="space-y-6">
-    <UAlert
+    <UiAlert
       v-if="submitError"
       color="error"
       variant="subtle"
@@ -365,56 +356,43 @@ onBeforeUnmount(() => {
       :description="submitError"
     />
 
-    <UAlert
-      color="neutral"
-      variant="soft"
-      title="자동 저장"
-      :description="saveStatusMessage"
-    />
+    <UiAlert color="neutral" variant="soft" title="자동 저장" :description="saveStatusMessage" />
 
     <div class="space-y-4">
-      <UFormField label="TITLE">
-        <UInput v-model="enteredTitle" />
-      </UFormField>
+      <UiFormField label="TITLE">
+        <UiInput v-model="enteredTitle" />
+      </UiFormField>
 
-      <UFormField label="DESCRIPTION">
-        <UInput v-model="enteredDescription" />
-      </UFormField>
+      <UiFormField label="DESCRIPTION">
+        <UiInput v-model="enteredDescription" />
+      </UiFormField>
 
-      <UFormField v-if="tagCategories && tagCategories.data" label="TAGS">
+      <UiFormField v-if="tagCategories && tagCategories.data" label="TAGS">
         <div v-for="category in tagCategories.data" :key="category.category">
           <p>{{ category.category }}</p>
-          <UInputMenu
-            :ref="(el: any) => inputMenuRefs[category.category] = el"
-            multiple
-            create-item
+          <UiTagsCombobox
             :model-value="tagsByCategory.get(category.category) ?? []"
             :items="category.tags"
             placeholder="태그 검색..."
             @update:model-value="(val: string[]) => setTagsForCategory(category.category, val)"
-            @create="(item: string) => setTagsForCategory(category.category, [...(tagsByCategory.get(category.category) ?? []), item])"
           />
         </div>
-      </UFormField>
+      </UiFormField>
     </div>
 
     <div class="flex flex-wrap items-end gap-4">
-      <UFormField label="PUBLISHED AT">
-        <UInputDate v-model="enteredPublishedAt" type="date" format="yyyy-MM-dd" />
-      </UFormField>
+      <UiFormField label="PUBLISHED AT">
+        <UiDateInput v-model="enteredPublishedAt" />
+      </UiFormField>
 
-      <UFormField label="STATUS">
-        <USelect
-          v-model="status"
-          :items="Object.values(POST_STATUS)"
-          class="w-36"
-        />
-      </UFormField>
+      <UiFormField label="STATUS">
+        <UiSelect v-model="status" :items="Object.values(POST_STATUS)" class="w-36" />
+      </UiFormField>
 
       <div>
-        <UButton color="primary" :loading="isSaving" @click="handleSubmitPost">
+        <UiButton color="primary" :loading="isSaving" @click="handleSubmitPost">
           {{ postId ? 'SAVE & EXIT' : 'CREATE & EXIT' }}
-        </UButton>
+        </UiButton>
       </div>
     </div>
 

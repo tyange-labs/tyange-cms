@@ -1,7 +1,4 @@
-function buildAuthHeaders(
-  headers: HeadersInit | undefined,
-  accessToken?: string,
-) {
+function buildAuthHeaders(headers: HeadersInit | undefined, accessToken?: string) {
   const normalized = new Headers(headers)
 
   if (accessToken) {

@@ -15,7 +15,7 @@ const { data, error } = await useFetch<PostListItem>(`/api/post?id=${route.param
 
 <template>
   <div class="space-y-4">
-    <UAlert
+    <UiAlert
       v-if="error"
       color="error"
       variant="subtle"
@@ -26,6 +26,4 @@ const { data, error } = await useFetch<PostListItem>(`/api/post?id=${route.param
   </div>
 </template>
 
-<style scoped>
-
-</style>
+<style scoped></style>
