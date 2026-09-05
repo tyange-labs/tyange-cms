@@ -37,6 +37,20 @@ Authorization 헤더를 그대로 실어 cms-api의 `GET /admin/wedding/guests`�
 `googleClientId` 런타임 설정, 배포 워크플로의 `NUXT_PUBLIC_GOOGLE_CLIENT_ID` 주입까지 전부.
 `tyange-cms-api` 쪽 `POST /login/google`은 아직 살아 있지만 CMS는 더 이상 호출하지 않는다.
 
+### 로컬 개발용 로그인 우회
+
+`tyange-cms-api`를 안 띄우고도 로그인 화면을 통과하고 싶으면 ID에 `dev`를 입력한다
+(비밀번호는 아무거나). `server/api/login/index.post.ts`가 `import.meta.dev`일 때만
+이 값을 가로채서 실제 백엔드를 호출하지 않고 관리자 세션(가짜 토큰)을 즉시 발급한다.
+`import.meta.dev`는 빌드 타임 상수라 프로덕션 빌드에는 이 분기 자체가 트리쉐이킹돼서 안 들어간다
+(`bun run build` 결과물에서 확인함). 로그인 화면(`LoginForm.vue`)은 전혀 안 건드렸다 — 우회
+로직은 서버 라우트 한 곳에만 있다.
+
+주의: 발급되는 토큰이 가짜라서 이후 `authenticatedFetch`로 나가는 실제 API 호출(포스트 목록,
+포트폴리오 등)은 백엔드가 없으면 당연히 실패한다. 로그인 화면 너머의 레이아웃/컴포넌트를 빠르게
+확인할 때 쓰는 용도고, 데이터까지 필요하면 `tyange-cms-api`를 직접 띄우거나 e2e 테스트처럼
+`auth` 쿠키를 직접 주입하는 방식을 쓴다.
+
 ## 현재 상태
 
 - 운영 중
