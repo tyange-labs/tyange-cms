@@ -78,10 +78,17 @@ ESLint(`@antfu/eslint-config` + `eslint-plugin-format`) 대신 Rust 기반 `oxli
   섀도잉)나 `no-underscore-dangle`(`_data` 같은 의도적 미사용 변수명) 같은 이 코드베이스의 기존
   관례를 전부 새 에러로 잡아내서 노이즈가 컸다.
 - `.oxfmtrc.json`: `semi: false`, `singleQuote: true`, `trailingComma: "all"` — 기존 antfu 스타일과
-  맞춤. `.vue` 파일도 포맷 대상이다.
+  맞춤. `.vue` 파일도 포맷 대상이다. `ignorePatterns`로 `.github/**`, `.vscode/**`는 제외했다 —
+  oxfmt는 YAML/JSONC도 공식 지원 언어라 버그가 아니라 의도된 동작이지만(실제로 워크플로 yml의
+  따옴표 스타일까지 바꿔버림), CI 워크플로나 에디터 설정까지 자동 포맷 대상에 넣는 건 원치 않아서
+  명시적으로 뺐다.
 - oxfmt는 Prettier 계열이라 `printWidth`(기본 80)에 맞으면 여러 줄로 풀어 쓰던 걸 한 줄로 접는다.
   기존 eslint-plugin-vue 스타일(속성 여러 개면 항상 줄바꿈)보다 훨씬 공격적으로 접히니, 큰 diff가
   한 번 발생하는 걸 감안하고 전체 레포를 한 번에 재포맷했다(2026-09).
+- VS Code는 `oxc.oxc-vscode` 확장 하나로 oxlint(린트)+oxfmt(포맷)를 전부 처리한다
+  (`.vscode/settings.json`의 `oxc.enable: true`, `editor.defaultFormatter`). 확장은
+  `.vscode/extensions.json`에 추천 목록으로 등록해뒀다. `.oxlintrc.json`/`.oxfmtrc.json`은
+  프로젝트 루트에 있으면 확장이 알아서 찾는다 — 별도 `oxc.configPath` 설정 불필요.
 - Nuxt 자동 임포트(`ref`, `useRoute`, `useAuthStore` 등)는 별도 globals 설정 없이도 oxlint가
   `no-undef` 류로 잡지 않는다 — ESLint와 달리 TS 파일에서 전역 미선언 변수를 별도로 체크하지 않기
   때문. `@nuxt/eslint`가 만들어주던 auto-import globals 목록(`.nuxt/eslint.config.mjs`)은 이제
