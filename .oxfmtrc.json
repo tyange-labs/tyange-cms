@@ -2,5 +2,5 @@
   "semi": false,
   "singleQuote": true,
   "trailingComma": "all",
-  "ignorePatterns": [".github/**", ".vscode/**"]
+  "ignorePatterns": [".forgejo/**", ".vscode/**"]
 }

@@ -60,6 +60,13 @@ Authorization 헤더를 그대로 실어 cms-api의 `GET /admin/wedding/guests`�
 - API에서 가계부/1:1 매칭/RSS/API Key 인증 제거됨 — CMS는 포스트/포트폴리오/태그/이미지 운영에 집중
 - `@nuxt/ui` 제거하고 Reka UI 기반 자체 컴포넌트로 전면 교체, Nuxt 4.5.2로 업그레이드 (2026-09)
 - ESLint(`@antfu/eslint-config`) 제거, `oxlint`/`oxfmt`로 전환 (2026-09)
+- CI를 GitHub Actions에서 Forgejo Actions로 전환 (2026-09) — `.github/workflows` 삭제,
+  `.forgejo/workflows/deploy.yml`로 이전. `uses:`는 전부 `https://github.com/...` 완전한
+  URL로 써야 함(`data.forgejo.org` 기본 레지스트리엔 `oven-sh/setup-bun` 같은 서드파티
+  액션이 없음). `runs-on: self-hosted`는 `tyange-labs` 조직 스코프 러너 중 Docker 격리
+  없는 host 라벨을 가리킴(tyange-dev와 동일 패턴). **Forgejo 쪽 secrets/vars는 자동으로
+  안 넘어와서 웹 UI에서 다시 등록해야 하고, 저장소 Settings → Units → Overview에서
+  Actions 체크박스도 켜야 워크플로가 인식된다** — 둘 다 아직 확인 안 함
 
 ## UI 컴포넌트 (`app/components/ui/`)
 
@@ -92,7 +99,8 @@ ESLint(`@antfu/eslint-config` + `eslint-plugin-format`) 대신 Rust 기반 `oxli
   섀도잉)나 `no-underscore-dangle`(`_data` 같은 의도적 미사용 변수명) 같은 이 코드베이스의 기존
   관례를 전부 새 에러로 잡아내서 노이즈가 컸다.
 - `.oxfmtrc.json`: `semi: false`, `singleQuote: true`, `trailingComma: "all"` — 기존 antfu 스타일과
-  맞춤. `.vue` 파일도 포맷 대상이다. `ignorePatterns`로 `.github/**`, `.vscode/**`는 제외했다 —
+  맞춤. `.vue` 파일도 포맷 대상이다. `ignorePatterns`로 `.forgejo/**`(CI 워크플로 옮긴 뒤로
+  경로 변경, 예전엔 `.github/**`), `.vscode/**`는 제외했다 —
   oxfmt는 YAML/JSONC도 공식 지원 언어라 버그가 아니라 의도된 동작이지만(실제로 워크플로 yml의
   따옴표 스타일까지 바꿔버림), CI 워크플로나 에디터 설정까지 자동 포맷 대상에 넣는 건 원치 않아서
   명시적으로 뺐다.
