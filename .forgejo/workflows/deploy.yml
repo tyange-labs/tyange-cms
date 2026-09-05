@@ -32,8 +32,8 @@ jobs:
         uses: https://github.com/appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.HOST }}
-          username: ${{ secrets.USER_NAME }}
-          key: ${{ secrets.PRIVATE_SSH_KEY }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
           source: ".output,ecosystem.config.js"
           target: ${{ vars.DEPLOY_PATH }}
           strip_components: 0
@@ -44,8 +44,8 @@ jobs:
         uses: https://github.com/appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.HOST }}
-          username: ${{ secrets.USER_NAME }}
-          key: ${{ secrets.PRIVATE_SSH_KEY }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
           script: |
             cd ${{ vars.DEPLOY_PATH }}
             export NUXT_PUBLIC_TYANGE_CMS_API_BASE='${{ vars.NUXT_PUBLIC_TYANGE_CMS_API_BASE }}'
