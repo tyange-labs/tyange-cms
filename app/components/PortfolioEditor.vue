@@ -92,13 +92,32 @@ function assignPortfolio(nextPortfolio?: PortfolioResponse | null) {
   portfolioId.value = nextPortfolio?.portfolio_id ?? null
   createdAt.value = nextPortfolio?.created_at ?? ''
   updatedAt.value = nextPortfolio?.updated_at ?? ''
-  portfolio.value = normalizePortfolioDocument(nextPortfolio?.content)
+
+  const normalized = normalizePortfolioDocument(nextPortfolio?.content)
+  // intro/career는 스키마상 optional이라 옛날 문서엔 아예 없을 수 있는데, 그때마다
+  // 폼에서 "섹션 없음" 상태를 별도로 다루면 분기만 늘어난다. 로드 시점에 빈 값으로
+  // 한 번 채워두면 폼은 항상 두 섹션이 있다고 가정하고 그릴 수 있다 — 저장 시
+  // 내용이 비어있으면 백엔드도 사실상 빈 섹션으로 저장하니 의미상 차이는 없다.
+  if (normalized) {
+    normalized.intro ??= { content: '', tech_stack: [] }
+    normalized.career ??= { summary_label: '', summary_value: '', companies: [] }
+  }
+  portfolio.value = normalized
 }
+
+// 서버에서 막 받아온 값을 assignPortfolio()가 채워 넣는 동안에는 아래 섹션별
+// deep watcher들이 "사용자가 방금 고쳤다"고 오해해서 자동 저장을 걸면 안 된다 —
+// 로드/새로고침 직후에 불필요한 PUT이 나가는 걸 막는 플래그.
+const isHydrating = ref(true)
 
 watch(
   data,
   (value) => {
+    isHydrating.value = true
     assignPortfolio(value?.data)
+    nextTick(() => {
+      isHydrating.value = false
+    })
   },
   { immediate: true },
 )
@@ -156,7 +175,7 @@ function createProject(): PortfolioProject {
     period: '',
     summary: '',
     stack: [],
-    highlights: [],
+    highlights_markdown: '',
     links: [createLink()],
   }
 }
@@ -165,7 +184,7 @@ function createCareerItem(): PortfolioCareerItem {
   return {
     title: '',
     period: '',
-    bullets: [],
+    bullets_markdown: '',
   }
 }
 
@@ -191,20 +210,6 @@ function updateProjectStack(index: number, value: string) {
   const p = portfolio.value
   if (!p) return
   p.featured_projects[index].stack = parseMultilineList(value)
-}
-
-function updateProjectHighlights(index: number, value: string) {
-  const p = portfolio.value
-  if (!p) return
-  p.featured_projects[index].highlights = parseMultilineList(value)
-}
-
-function updateCareerItemBullets(companyIndex: number, itemIndex: number, value: string) {
-  const p = portfolio.value
-  if (!p) return
-  const career = p.career ?? { summary_label: '', summary_value: '', companies: [] }
-  career.companies[companyIndex].items[itemIndex].bullets = parseMultilineList(value)
-  p.career = career
 }
 
 function addProject() {
@@ -408,9 +413,11 @@ function buildSectionContent(sectionKey: PortfolioSectionKey) {
   }
 }
 
-async function handleSaveSection(sectionKey: PortfolioSectionKey) {
-  submitError.value = ''
-  successMessage.value = ''
+async function handleSaveSection(sectionKey: PortfolioSectionKey, options?: { silent?: boolean }) {
+  if (!options?.silent) {
+    submitError.value = ''
+    successMessage.value = ''
+  }
   savingSection.value = sectionKey
 
   try {
@@ -426,8 +433,14 @@ async function handleSaveSection(sectionKey: PortfolioSectionKey) {
       updatedAt.value = response.data.updated_at
     }
 
-    successMessage.value = `${sectionLabels[sectionKey]} 섹션을 저장했습니다.`
+    if (options?.silent) {
+      lastAutoSavedAt.value[sectionKey] = response.data?.updated_at ?? updatedAt.value
+    } else {
+      successMessage.value = `${sectionLabels[sectionKey]} 섹션을 저장했습니다.`
+    }
   } catch (error: unknown) {
+    // 자동 저장이든 수동 저장이든 실패는 항상 눈에 띄게 알린다 — 조용히 실패하면
+    // 사용자는 저장됐다고 착각한 채로 계속 편집하게 된다.
     submitError.value = getErrorMessage(
       error,
       `${sectionLabels[sectionKey]} 섹션 저장에 실패했습니다.`,
@@ -436,6 +449,48 @@ async function handleSaveSection(sectionKey: PortfolioSectionKey) {
     savingSection.value = null
   }
 }
+
+// 섹션별 디바운스 자동 저장. 5개 섹션 각각 "저장" 버튼을 눌러야 하는 흐름이
+// 번거롭다는 피드백을 반영해, 블로그 에디터(Editor.client.vue)와 같은 패턴을
+// 붙였다 — 단 포트폴리오는 섹션별 PUT 엔드포인트가 나뉘어 있어서 섹션마다
+// 독립된 타이머를 둔다. 최초 생성(hasPortfolio가 false) 전까지는 저장할
+// 문서 자체가 없어서 자동 저장을 걸지 않는다("생성" 버튼으로만 최초 저장).
+const autoSaveDelay = 1500
+const autoSaveTimers: Partial<Record<PortfolioSectionKey, ReturnType<typeof setTimeout>>> = {}
+const lastAutoSavedAt = ref<Partial<Record<PortfolioSectionKey, string>>>({})
+
+function scheduleSectionAutoSave(sectionKey: PortfolioSectionKey) {
+  if (isHydrating.value || !hasPortfolio.value) return
+
+  const existingTimer = autoSaveTimers[sectionKey]
+  if (existingTimer) {
+    clearTimeout(existingTimer)
+  }
+  autoSaveTimers[sectionKey] = setTimeout(() => {
+    handleSaveSection(sectionKey, { silent: true })
+  }, autoSaveDelay)
+}
+
+function formatAutoSavedAt(value?: string) {
+  if (!value) return ''
+  // 백엔드가 내려주는 SQLite CURRENT_TIMESTAMP 형식("YYYY-MM-DD HH:MM:SS")에서
+  // 시:분:초만 뽑아 짧게 보여준다.
+  return value.split(' ')[1] ?? value
+}
+
+watch(() => portfolio.value?.identity, () => scheduleSectionAutoSave('identity'), { deep: true })
+watch(() => portfolio.value?.intro, () => scheduleSectionAutoSave('intro'), { deep: true })
+watch(
+  () => portfolio.value?.featured_projects,
+  () => scheduleSectionAutoSave('featured_projects'),
+  { deep: true },
+)
+watch(() => portfolio.value?.career, () => scheduleSectionAutoSave('career'), { deep: true })
+watch(
+  () => (portfolio.value ? [portfolio.value.slug, portfolio.value.version] : null),
+  () => scheduleSectionAutoSave('meta'),
+  { deep: true },
+)
 
 async function handleDelete() {
   if (!hasPortfolio.value) {
@@ -577,15 +632,20 @@ async function handleDelete() {
         <template #header>
           <div class="flex items-center justify-between gap-3">
             <h2 class="font-semibold">Basic</h2>
-            <UiButton
-              v-if="hasPortfolio"
-              size="sm"
-              :icon="Save"
-              :loading="savingSection === 'meta'"
-              @click="handleSaveSection('meta')"
-            >
-              저장
-            </UiButton>
+            <div class="flex items-center gap-2">
+              <span v-if="lastAutoSavedAt.meta" class="text-xs text-muted">
+                자동 저장 {{ formatAutoSavedAt(lastAutoSavedAt.meta) }}
+              </span>
+              <UiButton
+                v-if="hasPortfolio"
+                size="sm"
+                :icon="Save"
+                :loading="savingSection === 'meta'"
+                @click="handleSaveSection('meta')"
+              >
+                저장
+              </UiButton>
+            </div>
           </div>
         </template>
 
@@ -604,15 +664,20 @@ async function handleDelete() {
         <template #header>
           <div class="flex items-center justify-between gap-3">
             <h2 class="font-semibold">Contact</h2>
-            <UiButton
-              v-if="hasPortfolio"
-              size="sm"
-              :icon="Save"
-              :loading="savingSection === 'identity'"
-              @click="handleSaveSection('identity')"
-            >
-              저장
-            </UiButton>
+            <div class="flex items-center gap-2">
+              <span v-if="lastAutoSavedAt.identity" class="text-xs text-muted">
+                자동 저장 {{ formatAutoSavedAt(lastAutoSavedAt.identity) }}
+              </span>
+              <UiButton
+                v-if="hasPortfolio"
+                size="sm"
+                :icon="Save"
+                :loading="savingSection === 'identity'"
+                @click="handleSaveSection('identity')"
+              >
+                저장
+              </UiButton>
+            </div>
           </div>
         </template>
 
@@ -635,26 +700,28 @@ async function handleDelete() {
         <template #header>
           <div class="flex items-center justify-between gap-3">
             <h2 class="font-semibold">Intro</h2>
-            <UiButton
-              v-if="hasPortfolio"
-              size="sm"
-              :icon="Save"
-              :loading="savingSection === 'intro'"
-              @click="handleSaveSection('intro')"
-            >
-              저장
-            </UiButton>
+            <div class="flex items-center gap-2">
+              <span v-if="lastAutoSavedAt.intro" class="text-xs text-muted">
+                자동 저장 {{ formatAutoSavedAt(lastAutoSavedAt.intro) }}
+              </span>
+              <UiButton
+                v-if="hasPortfolio"
+                size="sm"
+                :icon="Save"
+                :loading="savingSection === 'intro'"
+                @click="handleSaveSection('intro')"
+              >
+                저장
+              </UiButton>
+            </div>
           </div>
         </template>
 
         <div class="space-y-6">
           <UiFormField label="Content (Markdown)">
-            <UiTextarea
-              :model-value="portfolio.intro?.content ?? ''"
-              :rows="6"
-              autoresize
+            <PortfolioMarkdownField
+              v-model="portfolio.intro.content"
               placeholder="마크다운으로 인트로 텍스트를 작성하세요."
-              @update:model-value="ensureIntro().content = $event"
             />
           </UiFormField>
 
@@ -722,6 +789,9 @@ async function handleDelete() {
           <div class="flex items-center justify-between gap-3">
             <h2 class="font-semibold">Featured Projects</h2>
             <div class="flex items-center gap-2">
+              <span v-if="lastAutoSavedAt.featured_projects" class="text-xs text-muted">
+                자동 저장 {{ formatAutoSavedAt(lastAutoSavedAt.featured_projects) }}
+              </span>
               <UiButton size="sm" variant="subtle" :icon="Plus" @click="addProject">
                 프로젝트 추가
               </UiButton>
@@ -739,20 +809,23 @@ async function handleDelete() {
         </template>
 
         <div v-if="portfolio.featured_projects.length" class="space-y-4">
-          <div
+          <details
             v-for="(project, projectIndex) in portfolio.featured_projects"
             :key="projectIndex"
+            open
             class="rounded-xl border border-default p-4"
           >
-            <div class="mb-4 flex items-center justify-between gap-3">
-              <h3 class="font-medium">Project {{ projectIndex + 1 }}</h3>
+            <summary class="mb-4 flex cursor-pointer items-center justify-between gap-3">
+              <h3 class="font-medium">
+                {{ project.title || project.slug || `Project ${projectIndex + 1}` }}
+              </h3>
               <UiButton
                 color="error"
                 variant="ghost"
                 :icon="Trash"
-                @click="removeProject(projectIndex)"
+                @click.prevent="removeProject(projectIndex)"
               />
-            </div>
+            </summary>
 
             <div class="grid gap-4 sm:grid-cols-2">
               <UiFormField label="Slug">
@@ -767,8 +840,8 @@ async function handleDelete() {
                 <UiInput v-model="project.period" />
               </UiFormField>
 
-              <UiFormField label="Summary" class="sm:col-span-2">
-                <UiTextarea v-model="project.summary" :rows="3" autoresize />
+              <UiFormField label="Summary (Markdown)" class="sm:col-span-2">
+                <PortfolioMarkdownField v-model="project.summary" />
               </UiFormField>
 
               <UiFormField label="Stack (one per line)" class="sm:col-span-2">
@@ -780,13 +853,8 @@ async function handleDelete() {
                 />
               </UiFormField>
 
-              <UiFormField label="Highlights (one per line)" class="sm:col-span-2">
-                <UiTextarea
-                  :model-value="project.highlights.join('\n')"
-                  :rows="4"
-                  autoresize
-                  @update:model-value="updateProjectHighlights(projectIndex, $event)"
-                />
+              <UiFormField label="Highlights (Markdown list)" class="sm:col-span-2">
+                <PortfolioMarkdownField v-model="project.highlights_markdown" />
               </UiFormField>
             </div>
 
@@ -820,7 +888,7 @@ async function handleDelete() {
                 </div>
               </div>
             </div>
-          </div>
+          </details>
         </div>
 
         <UiEmptyState v-else :icon="FolderOpen" label="No featured projects" />
@@ -831,6 +899,9 @@ async function handleDelete() {
           <div class="flex items-center justify-between gap-3">
             <h2 class="font-semibold">Career</h2>
             <div class="flex items-center gap-2">
+              <span v-if="lastAutoSavedAt.career" class="text-xs text-muted">
+                자동 저장 {{ formatAutoSavedAt(lastAutoSavedAt.career) }}
+              </span>
               <UiButton size="sm" variant="subtle" :icon="Plus" @click="addCareerCompany">
                 회사 추가
               </UiButton>
@@ -848,116 +919,111 @@ async function handleDelete() {
         </template>
 
         <div class="space-y-4">
-          <template v-if="portfolio.career">
-            <div class="grid gap-4 sm:grid-cols-2">
-              <UiFormField label="Summary Label">
-                <UiInput v-model="portfolio.career.summary_label" />
-              </UiFormField>
+          <div class="grid gap-4 sm:grid-cols-2">
+            <UiFormField label="Summary Label">
+              <UiInput v-model="portfolio.career.summary_label" />
+            </UiFormField>
 
-              <UiFormField label="Summary Value">
-                <UiInput v-model="portfolio.career.summary_value" />
-              </UiFormField>
-            </div>
+            <UiFormField label="Summary Value">
+              <UiInput v-model="portfolio.career.summary_value" />
+            </UiFormField>
+          </div>
 
-            <div v-if="portfolio.career.companies.length" class="space-y-4">
-              <div
-                v-for="(company, companyIndex) in portfolio.career.companies"
-                :key="companyIndex"
-                class="rounded-xl border border-default p-4"
-              >
-                <div class="mb-4 flex items-center justify-between gap-3">
-                  <h3 class="font-medium">Company {{ companyIndex + 1 }}</h3>
-                  <UiButton
-                    color="error"
-                    variant="ghost"
-                    :icon="Trash"
-                    @click="removeCareerCompany(companyIndex)"
-                  />
-                </div>
+          <div v-if="portfolio.career.companies.length" class="space-y-4">
+            <details
+              v-for="(company, companyIndex) in portfolio.career.companies"
+              :key="companyIndex"
+              open
+              class="rounded-xl border border-default p-4"
+            >
+              <summary class="mb-4 flex cursor-pointer items-center justify-between gap-3">
+                <h3 class="font-medium">
+                  {{ company.company || `Company ${companyIndex + 1}` }}
+                </h3>
+                <UiButton
+                  color="error"
+                  variant="ghost"
+                  :icon="Trash"
+                  @click.prevent="removeCareerCompany(companyIndex)"
+                />
+              </summary>
 
-                <div class="grid gap-4 sm:grid-cols-2">
-                  <UiFormField label="Company">
-                    <UiInput v-model="company.company" />
-                  </UiFormField>
+              <div class="grid gap-4 sm:grid-cols-2">
+                <UiFormField label="Company">
+                  <UiInput v-model="company.company" />
+                </UiFormField>
 
-                  <UiFormField label="Period">
-                    <UiInput v-model="company.period" />
-                  </UiFormField>
+                <UiFormField label="Period">
+                  <UiInput v-model="company.period" />
+                </UiFormField>
 
-                  <UiFormField label="Employment Type">
-                    <UiInput v-model="company.employment_type" />
-                  </UiFormField>
+                <UiFormField label="Employment Type">
+                  <UiInput v-model="company.employment_type" />
+                </UiFormField>
 
-                  <UiFormField label="Role">
-                    <UiInput v-model="company.role" />
-                  </UiFormField>
+                <UiFormField label="Role">
+                  <UiInput v-model="company.role" />
+                </UiFormField>
 
-                  <UiFormField label="Position" class="sm:col-span-2">
-                    <UiInput v-model="company.position" />
-                  </UiFormField>
-                </div>
-
-                <div class="mt-4 rounded-lg border border-default p-4">
-                  <div class="mb-3 flex items-center justify-between gap-3">
-                    <h4 class="font-medium">Career Items</h4>
-                    <UiButton
-                      size="sm"
-                      variant="subtle"
-                      :icon="Plus"
-                      @click="addCareerItem(companyIndex)"
-                    >
-                      항목 추가
-                    </UiButton>
-                  </div>
-
-                  <div v-if="company.items.length" class="space-y-4">
-                    <div
-                      v-for="(item, itemIndex) in company.items"
-                      :key="itemIndex"
-                      class="rounded-lg border border-default p-4"
-                    >
-                      <div class="mb-4 flex items-center justify-between gap-3">
-                        <h5 class="font-medium">Item {{ itemIndex + 1 }}</h5>
-                        <UiButton
-                          color="error"
-                          variant="ghost"
-                          :icon="Trash"
-                          @click="removeCareerItem(companyIndex, itemIndex)"
-                        />
-                      </div>
-
-                      <div class="space-y-4">
-                        <UiFormField label="Title">
-                          <UiInput v-model="item.title" />
-                        </UiFormField>
-
-                        <UiFormField label="Period">
-                          <UiInput v-model="item.period" />
-                        </UiFormField>
-
-                        <UiFormField label="Bullets (one per line)">
-                          <UiTextarea
-                            :model-value="item.bullets.join('\n')"
-                            :rows="5"
-                            autoresize
-                            @update:model-value="
-                              updateCareerItemBullets(companyIndex, itemIndex, $event)
-                            "
-                          />
-                        </UiFormField>
-                      </div>
-                    </div>
-                  </div>
-
-                  <UiEmptyState v-else :icon="BriefcaseBusiness" label="No career items" />
-                </div>
+                <UiFormField label="Position" class="sm:col-span-2">
+                  <UiInput v-model="company.position" />
+                </UiFormField>
               </div>
-            </div>
 
-            <UiEmptyState v-else :icon="Briefcase" label="No career companies" />
-          </template>
+              <div class="mt-4 rounded-lg border border-default p-4">
+                <div class="mb-3 flex items-center justify-between gap-3">
+                  <h4 class="font-medium">Career Items</h4>
+                  <UiButton
+                    size="sm"
+                    variant="subtle"
+                    :icon="Plus"
+                    @click="addCareerItem(companyIndex)"
+                  >
+                    항목 추가
+                  </UiButton>
+                </div>
 
-          <UiEmptyState v-else :icon="Briefcase" label="Career section unavailable" />
+                <div v-if="company.items.length" class="space-y-4">
+                  <details
+                    v-for="(item, itemIndex) in company.items"
+                    :key="itemIndex"
+                    open
+                    class="rounded-lg border border-default p-4"
+                  >
+                    <summary class="mb-4 flex cursor-pointer items-center justify-between gap-3">
+                      <h5 class="font-medium">
+                        {{ item.title || `Item ${itemIndex + 1}` }}
+                      </h5>
+                      <UiButton
+                        color="error"
+                        variant="ghost"
+                        :icon="Trash"
+                        @click.prevent="removeCareerItem(companyIndex, itemIndex)"
+                      />
+                    </summary>
+
+                    <div class="space-y-4">
+                      <UiFormField label="Title">
+                        <UiInput v-model="item.title" />
+                      </UiFormField>
+
+                      <UiFormField label="Period">
+                        <UiInput v-model="item.period" />
+                      </UiFormField>
+
+                      <UiFormField label="Bullets (Markdown list)">
+                        <PortfolioMarkdownField v-model="item.bullets_markdown" />
+                      </UiFormField>
+                    </div>
+                  </details>
+                </div>
+
+                <UiEmptyState v-else :icon="BriefcaseBusiness" label="No career items" />
+              </div>
+            </details>
+          </div>
+
+          <UiEmptyState v-else :icon="Briefcase" label="No career companies" />
         </div>
       </UiCard>
     </template>

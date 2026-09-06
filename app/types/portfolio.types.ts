@@ -13,16 +13,19 @@ export interface PortfolioProject {
   slug: string
   title: string
   period: string
+  /** Markdown. */
   summary: string
   stack: string[]
-  highlights: string[]
+  /** Markdown 불릿 리스트(`- 항목` 줄바꿈). 예전 highlights: string[]을 대체(2026-09). */
+  highlights_markdown: string
   links: PortfolioLink[]
 }
 
 export interface PortfolioCareerItem {
   title: string
   period?: string | null
-  bullets: string[]
+  /** Markdown 불릿 리스트. 예전 bullets: string[]을 대체(2026-09). */
+  bullets_markdown: string
 }
 
 export interface PortfolioCareerCompany {
@@ -92,7 +95,7 @@ export function normalizePortfolioDocument(
     featured_projects: (document.featured_projects ?? []).map((project) => ({
       ...project,
       stack: [...(project.stack ?? [])],
-      highlights: [...(project.highlights ?? [])],
+      highlights_markdown: project.highlights_markdown ?? '',
       links: (project.links ?? []).map((link) => ({ ...link })),
     })),
     career: document.career
@@ -103,7 +106,7 @@ export function normalizePortfolioDocument(
             ...company,
             items: (company.items ?? []).map((item) => ({
               ...item,
-              bullets: [...(item.bullets ?? [])],
+              bullets_markdown: item.bullets_markdown ?? '',
             })),
           })),
         }
