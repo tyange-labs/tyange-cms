@@ -14,6 +14,7 @@ import type { CMSResponse } from '~/types/response.types'
 import {
   Briefcase,
   BriefcaseBusiness,
+  ChevronDown,
   CodeXml,
   FolderOpen,
   Plus,
@@ -22,16 +23,28 @@ import {
   Trash,
   Upload,
 } from 'lucide-vue-next'
+import {
+  AccordionContent,
+  AccordionHeader,
+  AccordionItem,
+  AccordionRoot,
+  AccordionTrigger,
+  TabsContent,
+  TabsList,
+  TabsRoot,
+  TabsTrigger,
+} from 'reka-ui'
 import { handleUnauthorizedError, useAuthHeaders } from '~/composables/useAuthenticatedApi'
+import { useToast } from '~/composables/useToast'
 import { normalizePortfolioDocument } from '~/types/portfolio.types'
 
 const authHeaders = useAuthHeaders()
+const { push: pushToast } = useToast()
 
 const isSaving = ref(false)
 const savingSection = ref<PortfolioSectionKey | null>(null)
 const isDeleting = ref(false)
 const submitError = ref('')
-const successMessage = ref('')
 const hasPortfolio = ref(false)
 const portfolioId = ref<number | null>(null)
 const createdAt = ref('')
@@ -87,6 +100,37 @@ function getErrorMessage(error: unknown, fallback: string) {
   return fallback
 }
 
+// Featured Projects/Career를 Accordion으로 접었다 펼 수 있게 되면서, 예전
+// `<details open>`(=항상 강제로 펼쳐짐)이 하던 "기본은 펼친 상태" 역할을 이 배열들이
+// 대신한다. 항목이 추가/삭제될 때마다(목록이 재구성될 때) 전부 펼친 상태로 되돌리는
+// 식으로 단순하게 관리한다 — 인덱스 기반 key라 항목 순서가 바뀌면 완벽하게 들어맞진
+// 않지만, 어차피 이 컴포넌트 전체가 인덱스를 key로 쓰고 있어서 그 이상의 정교함은
+// 이 화면에 과한 설계다.
+const openProjectKeys = ref<string[]>([])
+const openCompanyKeys = ref<string[]>([])
+const openCareerItemKeys = ref<string[]>([])
+
+function projectAccordionKey(index: number) {
+  return `project-${index}`
+}
+function companyAccordionKey(index: number) {
+  return `company-${index}`
+}
+function careerItemAccordionKey(companyIndex: number, itemIndex: number) {
+  return `item-${companyIndex}-${itemIndex}`
+}
+
+function resetOpenAccordionKeys() {
+  const p = portfolio.value
+  openProjectKeys.value = p ? p.featured_projects.map((_, index) => projectAccordionKey(index)) : []
+
+  const companies = p?.career?.companies ?? []
+  openCompanyKeys.value = companies.map((_, index) => companyAccordionKey(index))
+  openCareerItemKeys.value = companies.flatMap((company, companyIndex) =>
+    company.items.map((_, itemIndex) => careerItemAccordionKey(companyIndex, itemIndex)),
+  )
+}
+
 function assignPortfolio(nextPortfolio?: PortfolioResponse | null) {
   hasPortfolio.value = Boolean(nextPortfolio)
   portfolioId.value = nextPortfolio?.portfolio_id ?? null
@@ -103,6 +147,7 @@ function assignPortfolio(nextPortfolio?: PortfolioResponse | null) {
     normalized.career ??= { summary_label: '', summary_value: '', companies: [] }
   }
   portfolio.value = normalized
+  resetOpenAccordionKeys()
 }
 
 // 서버에서 막 받아온 값을 assignPortfolio()가 채워 넣는 동안에는 아래 섹션별
@@ -199,29 +244,18 @@ function createCareerCompany(): PortfolioCareerCompany {
   }
 }
 
-function parseMultilineList(value: string) {
-  return value
-    .split('\n')
-    .map((item) => item.trim())
-    .filter(Boolean)
-}
-
-function updateProjectStack(index: number, value: string) {
-  const p = portfolio.value
-  if (!p) return
-  p.featured_projects[index].stack = parseMultilineList(value)
-}
-
 function addProject() {
   const p = portfolio.value
   if (!p) return
   p.featured_projects.push(createProject())
+  resetOpenAccordionKeys()
 }
 
 function removeProject(index: number) {
   const p = portfolio.value
   if (!p) return
   p.featured_projects.splice(index, 1)
+  resetOpenAccordionKeys()
 }
 
 function addProjectLink(projectIndex: number) {
@@ -242,6 +276,7 @@ function addCareerCompany() {
   const career = p.career ?? { summary_label: '', summary_value: '', companies: [] }
   career.companies.push(createCareerCompany())
   p.career = career
+  resetOpenAccordionKeys()
 }
 
 function removeCareerCompany(index: number) {
@@ -250,6 +285,7 @@ function removeCareerCompany(index: number) {
   const career = p.career ?? { summary_label: '', summary_value: '', companies: [] }
   career.companies.splice(index, 1)
   p.career = career
+  resetOpenAccordionKeys()
 }
 
 function addCareerItem(companyIndex: number) {
@@ -258,6 +294,7 @@ function addCareerItem(companyIndex: number) {
   const career = p.career ?? { summary_label: '', summary_value: '', companies: [] }
   career.companies[companyIndex].items.push(createCareerItem())
   p.career = career
+  resetOpenAccordionKeys()
 }
 
 function removeCareerItem(companyIndex: number, itemIndex: number) {
@@ -266,6 +303,7 @@ function removeCareerItem(companyIndex: number, itemIndex: number) {
   const career = p.career ?? { summary_label: '', summary_value: '', companies: [] }
   career.companies[companyIndex].items.splice(itemIndex, 1)
   p.career = career
+  resetOpenAccordionKeys()
 }
 
 function ensureIntro(): PortfolioIntroSection {
@@ -356,13 +394,11 @@ function buildPayload() {
 
 async function handleRefresh() {
   submitError.value = ''
-  successMessage.value = ''
   await refresh()
 }
 
 async function handleSave() {
   submitError.value = ''
-  successMessage.value = ''
   isSaving.value = true
 
   try {
@@ -374,10 +410,9 @@ async function handleSave() {
       },
     )
 
+    const wasExisting = hasPortfolio.value
     assignPortfolio(response.data)
-    successMessage.value = hasPortfolio.value
-      ? '포트폴리오를 저장했습니다.'
-      : '포트폴리오를 생성했습니다.'
+    pushToast(wasExisting ? '포트폴리오를 저장했습니다.' : '포트폴리오를 생성했습니다.')
   } catch (error: unknown) {
     submitError.value = getErrorMessage(error, '포트폴리오 저장에 실패했습니다.')
   } finally {
@@ -392,6 +427,14 @@ const sectionLabels: Record<PortfolioSectionKey, string> = {
   featured_projects: 'Featured Projects',
   career: 'Career',
 }
+const sectionTabOrder: PortfolioSectionKey[] = [
+  'meta',
+  'identity',
+  'intro',
+  'featured_projects',
+  'career',
+]
+const activeTab = ref<PortfolioSectionKey>('meta')
 
 function buildSectionContent(sectionKey: PortfolioSectionKey) {
   const p = portfolio.value
@@ -416,7 +459,6 @@ function buildSectionContent(sectionKey: PortfolioSectionKey) {
 async function handleSaveSection(sectionKey: PortfolioSectionKey, options?: { silent?: boolean }) {
   if (!options?.silent) {
     submitError.value = ''
-    successMessage.value = ''
   }
   savingSection.value = sectionKey
 
@@ -436,7 +478,7 @@ async function handleSaveSection(sectionKey: PortfolioSectionKey, options?: { si
     if (options?.silent) {
       lastAutoSavedAt.value[sectionKey] = response.data?.updated_at ?? updatedAt.value
     } else {
-      successMessage.value = `${sectionLabels[sectionKey]} 섹션을 저장했습니다.`
+      pushToast(`${sectionLabels[sectionKey]} 섹션을 저장했습니다.`)
     }
   } catch (error: unknown) {
     // 자동 저장이든 수동 저장이든 실패는 항상 눈에 띄게 알린다 — 조용히 실패하면
@@ -478,14 +520,26 @@ function formatAutoSavedAt(value?: string) {
   return value.split(' ')[1] ?? value
 }
 
-watch(() => portfolio.value?.identity, () => scheduleSectionAutoSave('identity'), { deep: true })
-watch(() => portfolio.value?.intro, () => scheduleSectionAutoSave('intro'), { deep: true })
+watch(
+  () => portfolio.value?.identity,
+  () => scheduleSectionAutoSave('identity'),
+  { deep: true },
+)
+watch(
+  () => portfolio.value?.intro,
+  () => scheduleSectionAutoSave('intro'),
+  { deep: true },
+)
 watch(
   () => portfolio.value?.featured_projects,
   () => scheduleSectionAutoSave('featured_projects'),
   { deep: true },
 )
-watch(() => portfolio.value?.career, () => scheduleSectionAutoSave('career'), { deep: true })
+watch(
+  () => portfolio.value?.career,
+  () => scheduleSectionAutoSave('career'),
+  { deep: true },
+)
 watch(
   () => (portfolio.value ? [portfolio.value.slug, portfolio.value.version] : null),
   () => scheduleSectionAutoSave('meta'),
@@ -504,7 +558,6 @@ async function handleDelete() {
   }
 
   submitError.value = ''
-  successMessage.value = ''
   isDeleting.value = true
 
   try {
@@ -513,7 +566,7 @@ async function handleDelete() {
     })
 
     assignPortfolio(null)
-    successMessage.value = '포트폴리오를 삭제했습니다.'
+    pushToast('포트폴리오를 삭제했습니다.')
   } catch (error: unknown) {
     submitError.value = getErrorMessage(error, '포트폴리오 삭제에 실패했습니다.')
   } finally {
@@ -575,14 +628,6 @@ async function handleDelete() {
       :description="loadErrorMessage || submitError"
     />
 
-    <UiAlert
-      v-if="successMessage"
-      color="success"
-      variant="subtle"
-      title="완료"
-      :description="successMessage"
-    />
-
     <div v-if="!portfolio && !isLoading && !loadErrorMessage" class="space-y-4">
       <UiAlert
         color="warning"
@@ -628,404 +673,471 @@ async function handleDelete() {
         </div>
       </UiCard>
 
-      <UiCard>
-        <template #header>
-          <div class="flex items-center justify-between gap-3">
-            <h2 class="font-semibold">Basic</h2>
-            <div class="flex items-center gap-2">
-              <span v-if="lastAutoSavedAt.meta" class="text-xs text-muted">
-                자동 저장 {{ formatAutoSavedAt(lastAutoSavedAt.meta) }}
-              </span>
-              <UiButton
-                v-if="hasPortfolio"
-                size="sm"
-                :icon="Save"
-                :loading="savingSection === 'meta'"
-                @click="handleSaveSection('meta')"
-              >
-                저장
-              </UiButton>
-            </div>
-          </div>
-        </template>
-
-        <div class="grid gap-4 sm:grid-cols-2">
-          <UiFormField label="Slug">
-            <UiInput v-model="portfolio.slug" placeholder="dev" />
-          </UiFormField>
-
-          <UiFormField label="Version">
-            <UiInput v-model.number="portfolio.version" type="number" />
-          </UiFormField>
-        </div>
-      </UiCard>
-
-      <UiCard>
-        <template #header>
-          <div class="flex items-center justify-between gap-3">
-            <h2 class="font-semibold">Contact</h2>
-            <div class="flex items-center gap-2">
-              <span v-if="lastAutoSavedAt.identity" class="text-xs text-muted">
-                자동 저장 {{ formatAutoSavedAt(lastAutoSavedAt.identity) }}
-              </span>
-              <UiButton
-                v-if="hasPortfolio"
-                size="sm"
-                :icon="Save"
-                :loading="savingSection === 'identity'"
-                @click="handleSaveSection('identity')"
-              >
-                저장
-              </UiButton>
-            </div>
-          </div>
-        </template>
-
-        <div class="grid gap-4 sm:grid-cols-2">
-          <UiFormField label="Name">
-            <UiInput v-model="portfolio.identity.name" />
-          </UiFormField>
-
-          <UiFormField label="Email">
-            <UiInput v-model="portfolio.identity.email" />
-          </UiFormField>
-
-          <UiFormField label="Github URL">
-            <UiInput v-model="portfolio.identity.github_url" />
-          </UiFormField>
-        </div>
-      </UiCard>
-
-      <UiCard>
-        <template #header>
-          <div class="flex items-center justify-between gap-3">
-            <h2 class="font-semibold">Intro</h2>
-            <div class="flex items-center gap-2">
-              <span v-if="lastAutoSavedAt.intro" class="text-xs text-muted">
-                자동 저장 {{ formatAutoSavedAt(lastAutoSavedAt.intro) }}
-              </span>
-              <UiButton
-                v-if="hasPortfolio"
-                size="sm"
-                :icon="Save"
-                :loading="savingSection === 'intro'"
-                @click="handleSaveSection('intro')"
-              >
-                저장
-              </UiButton>
-            </div>
-          </div>
-        </template>
-
-        <div class="space-y-6">
-          <UiFormField label="Content (Markdown)">
-            <PortfolioMarkdownField
-              v-model="portfolio.intro.content"
-              placeholder="마크다운으로 인트로 텍스트를 작성하세요."
-            />
-          </UiFormField>
-
-          <div>
-            <div class="mb-3 flex items-center justify-between gap-3">
-              <h3 class="font-medium">Tech Stack</h3>
-              <UiButton size="sm" variant="subtle" :icon="Plus" @click="addTechStackItem">
-                기술 추가
-              </UiButton>
-            </div>
-
-            <div v-if="portfolio.intro?.tech_stack?.length" class="space-y-3">
-              <div
-                v-for="(item, index) in portfolio.intro.tech_stack"
-                :key="index"
-                class="grid items-center gap-3 sm:grid-cols-[1fr_1fr_auto_auto]"
-              >
-                <UiInput v-model="item.name" placeholder="이름 (e.g. React)" />
-
-                <div class="flex items-center gap-2">
-                  <img
-                    v-if="item.icon_url"
-                    :src="item.icon_url"
-                    :alt="item.name"
-                    class="h-6 w-6 shrink-0 object-contain"
-                  />
-                  <span v-if="item.icon_url" class="truncate text-xs text-muted">
-                    {{ item.icon_url.split('/').pop() }}
-                  </span>
-                  <span v-else class="text-xs text-muted">아이콘 없음</span>
-                </div>
-
-                <UiButton
-                  size="sm"
-                  variant="subtle"
-                  :icon="Upload"
-                  @click="($refs[`iconInput-${index}`] as HTMLInputElement[])?.[0]?.click()"
-                >
-                  업로드
-                </UiButton>
-                <input
-                  :ref="`iconInput-${index}`"
-                  type="file"
-                  accept="image/svg+xml,image/png,image/webp"
-                  class="hidden"
-                  @change="handleIconUpload(index, $event)"
-                />
-
-                <UiButton
-                  color="error"
-                  variant="ghost"
-                  :icon="Trash"
-                  @click="removeTechStackItem(index)"
-                />
-              </div>
-            </div>
-
-            <UiEmptyState v-else :icon="CodeXml" label="No tech stack items" />
-          </div>
-        </div>
-      </UiCard>
-
-      <UiCard>
-        <template #header>
-          <div class="flex items-center justify-between gap-3">
-            <h2 class="font-semibold">Featured Projects</h2>
-            <div class="flex items-center gap-2">
-              <span v-if="lastAutoSavedAt.featured_projects" class="text-xs text-muted">
-                자동 저장 {{ formatAutoSavedAt(lastAutoSavedAt.featured_projects) }}
-              </span>
-              <UiButton size="sm" variant="subtle" :icon="Plus" @click="addProject">
-                프로젝트 추가
-              </UiButton>
-              <UiButton
-                v-if="hasPortfolio"
-                size="sm"
-                :icon="Save"
-                :loading="savingSection === 'featured_projects'"
-                @click="handleSaveSection('featured_projects')"
-              >
-                저장
-              </UiButton>
-            </div>
-          </div>
-        </template>
-
-        <div v-if="portfolio.featured_projects.length" class="space-y-4">
-          <details
-            v-for="(project, projectIndex) in portfolio.featured_projects"
-            :key="projectIndex"
-            open
-            class="rounded-xl border border-default p-4"
+      <TabsRoot v-model="activeTab" class="space-y-4">
+        <TabsList class="flex gap-4 overflow-x-auto border-b border-default">
+          <TabsTrigger
+            v-for="key in sectionTabOrder"
+            :key="key"
+            :value="key"
+            class="shrink-0 border-b-2 border-transparent px-1 pb-3 text-sm font-medium text-muted transition-colors hover:text-default data-[state=active]:border-primary data-[state=active]:text-primary"
           >
-            <summary class="mb-4 flex cursor-pointer items-center justify-between gap-3">
-              <h3 class="font-medium">
-                {{ project.title || project.slug || `Project ${projectIndex + 1}` }}
-              </h3>
-              <UiButton
-                color="error"
-                variant="ghost"
-                :icon="Trash"
-                @click.prevent="removeProject(projectIndex)"
-              />
-            </summary>
+            {{ sectionLabels[key] }}
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="meta">
+          <UiCard>
+            <template #header>
+              <div class="flex items-center justify-between gap-3">
+                <h2 class="font-semibold">Basic</h2>
+                <div class="flex items-center gap-2">
+                  <span v-if="lastAutoSavedAt.meta" class="text-xs text-muted">
+                    자동 저장 {{ formatAutoSavedAt(lastAutoSavedAt.meta) }}
+                  </span>
+                  <UiButton
+                    v-if="hasPortfolio"
+                    size="sm"
+                    :icon="Save"
+                    :loading="savingSection === 'meta'"
+                    @click="handleSaveSection('meta')"
+                  >
+                    저장
+                  </UiButton>
+                </div>
+              </div>
+            </template>
 
             <div class="grid gap-4 sm:grid-cols-2">
               <UiFormField label="Slug">
-                <UiInput v-model="project.slug" />
+                <UiInput v-model="portfolio.slug" placeholder="dev" />
               </UiFormField>
 
-              <UiFormField label="Title">
-                <UiInput v-model="project.title" />
-              </UiFormField>
-
-              <UiFormField label="Period">
-                <UiInput v-model="project.period" />
-              </UiFormField>
-
-              <UiFormField label="Summary (Markdown)" class="sm:col-span-2">
-                <PortfolioMarkdownField v-model="project.summary" />
-              </UiFormField>
-
-              <UiFormField label="Stack (one per line)" class="sm:col-span-2">
-                <UiTextarea
-                  :model-value="project.stack.join('\n')"
-                  :rows="4"
-                  autoresize
-                  @update:model-value="updateProjectStack(projectIndex, $event)"
-                />
-              </UiFormField>
-
-              <UiFormField label="Highlights (Markdown list)" class="sm:col-span-2">
-                <PortfolioMarkdownField v-model="project.highlights_markdown" />
+              <UiFormField label="Version">
+                <UiInput v-model.number="portfolio.version" type="number" />
               </UiFormField>
             </div>
+          </UiCard>
+        </TabsContent>
 
-            <div class="mt-4 rounded-lg border border-default p-4">
-              <div class="mb-3 flex items-center justify-between gap-3">
-                <h4 class="font-medium">Links</h4>
-                <UiButton
-                  size="sm"
-                  variant="subtle"
-                  :icon="Plus"
-                  @click="addProjectLink(projectIndex)"
-                >
-                  링크 추가
-                </UiButton>
-              </div>
-
-              <div class="space-y-3">
-                <div
-                  v-for="(link, linkIndex) in project.links"
-                  :key="linkIndex"
-                  class="grid gap-3 sm:grid-cols-[1fr_1fr_auto]"
-                >
-                  <UiInput v-model="link.label" placeholder="Label" />
-                  <UiInput v-model="link.url" placeholder="URL" />
+        <TabsContent value="identity">
+          <UiCard>
+            <template #header>
+              <div class="flex items-center justify-between gap-3">
+                <h2 class="font-semibold">Contact</h2>
+                <div class="flex items-center gap-2">
+                  <span v-if="lastAutoSavedAt.identity" class="text-xs text-muted">
+                    자동 저장 {{ formatAutoSavedAt(lastAutoSavedAt.identity) }}
+                  </span>
                   <UiButton
-                    color="error"
-                    variant="ghost"
-                    :icon="Trash"
-                    @click="removeProjectLink(projectIndex, linkIndex)"
-                  />
+                    v-if="hasPortfolio"
+                    size="sm"
+                    :icon="Save"
+                    :loading="savingSection === 'identity'"
+                    @click="handleSaveSection('identity')"
+                  >
+                    저장
+                  </UiButton>
                 </div>
               </div>
+            </template>
+
+            <div class="grid gap-4 sm:grid-cols-2">
+              <UiFormField label="Name">
+                <UiInput v-model="portfolio.identity.name" />
+              </UiFormField>
+
+              <UiFormField label="Email">
+                <UiInput v-model="portfolio.identity.email" />
+              </UiFormField>
+
+              <UiFormField label="Github URL">
+                <UiInput v-model="portfolio.identity.github_url" />
+              </UiFormField>
             </div>
-          </details>
-        </div>
+          </UiCard>
+        </TabsContent>
 
-        <UiEmptyState v-else :icon="FolderOpen" label="No featured projects" />
-      </UiCard>
-
-      <UiCard>
-        <template #header>
-          <div class="flex items-center justify-between gap-3">
-            <h2 class="font-semibold">Career</h2>
-            <div class="flex items-center gap-2">
-              <span v-if="lastAutoSavedAt.career" class="text-xs text-muted">
-                자동 저장 {{ formatAutoSavedAt(lastAutoSavedAt.career) }}
-              </span>
-              <UiButton size="sm" variant="subtle" :icon="Plus" @click="addCareerCompany">
-                회사 추가
-              </UiButton>
-              <UiButton
-                v-if="hasPortfolio"
-                size="sm"
-                :icon="Save"
-                :loading="savingSection === 'career'"
-                @click="handleSaveSection('career')"
-              >
-                저장
-              </UiButton>
-            </div>
-          </div>
-        </template>
-
-        <div class="space-y-4">
-          <div class="grid gap-4 sm:grid-cols-2">
-            <UiFormField label="Summary Label">
-              <UiInput v-model="portfolio.career.summary_label" />
-            </UiFormField>
-
-            <UiFormField label="Summary Value">
-              <UiInput v-model="portfolio.career.summary_value" />
-            </UiFormField>
-          </div>
-
-          <div v-if="portfolio.career.companies.length" class="space-y-4">
-            <details
-              v-for="(company, companyIndex) in portfolio.career.companies"
-              :key="companyIndex"
-              open
-              class="rounded-xl border border-default p-4"
-            >
-              <summary class="mb-4 flex cursor-pointer items-center justify-between gap-3">
-                <h3 class="font-medium">
-                  {{ company.company || `Company ${companyIndex + 1}` }}
-                </h3>
-                <UiButton
-                  color="error"
-                  variant="ghost"
-                  :icon="Trash"
-                  @click.prevent="removeCareerCompany(companyIndex)"
-                />
-              </summary>
-
-              <div class="grid gap-4 sm:grid-cols-2">
-                <UiFormField label="Company">
-                  <UiInput v-model="company.company" />
-                </UiFormField>
-
-                <UiFormField label="Period">
-                  <UiInput v-model="company.period" />
-                </UiFormField>
-
-                <UiFormField label="Employment Type">
-                  <UiInput v-model="company.employment_type" />
-                </UiFormField>
-
-                <UiFormField label="Role">
-                  <UiInput v-model="company.role" />
-                </UiFormField>
-
-                <UiFormField label="Position" class="sm:col-span-2">
-                  <UiInput v-model="company.position" />
-                </UiFormField>
-              </div>
-
-              <div class="mt-4 rounded-lg border border-default p-4">
-                <div class="mb-3 flex items-center justify-between gap-3">
-                  <h4 class="font-medium">Career Items</h4>
+        <TabsContent value="intro">
+          <UiCard>
+            <template #header>
+              <div class="flex items-center justify-between gap-3">
+                <h2 class="font-semibold">Intro</h2>
+                <div class="flex items-center gap-2">
+                  <span v-if="lastAutoSavedAt.intro" class="text-xs text-muted">
+                    자동 저장 {{ formatAutoSavedAt(lastAutoSavedAt.intro) }}
+                  </span>
                   <UiButton
+                    v-if="hasPortfolio"
                     size="sm"
-                    variant="subtle"
-                    :icon="Plus"
-                    @click="addCareerItem(companyIndex)"
+                    :icon="Save"
+                    :loading="savingSection === 'intro'"
+                    @click="handleSaveSection('intro')"
                   >
-                    항목 추가
+                    저장
+                  </UiButton>
+                </div>
+              </div>
+            </template>
+
+            <div class="space-y-6">
+              <UiFormField label="Content (Markdown)">
+                <PortfolioMarkdownField
+                  v-model="portfolio.intro.content"
+                  placeholder="마크다운으로 인트로 텍스트를 작성하세요."
+                />
+              </UiFormField>
+
+              <div>
+                <div class="mb-3 flex items-center justify-between gap-3">
+                  <h3 class="font-medium">Tech Stack</h3>
+                  <UiButton size="sm" variant="subtle" :icon="Plus" @click="addTechStackItem">
+                    기술 추가
                   </UiButton>
                 </div>
 
-                <div v-if="company.items.length" class="space-y-4">
-                  <details
-                    v-for="(item, itemIndex) in company.items"
-                    :key="itemIndex"
-                    open
-                    class="rounded-lg border border-default p-4"
+                <div v-if="portfolio.intro?.tech_stack?.length" class="space-y-3">
+                  <div
+                    v-for="(item, index) in portfolio.intro.tech_stack"
+                    :key="index"
+                    class="grid items-center gap-3 sm:grid-cols-[1fr_1fr_auto_auto]"
                   >
-                    <summary class="mb-4 flex cursor-pointer items-center justify-between gap-3">
-                      <h5 class="font-medium">
-                        {{ item.title || `Item ${itemIndex + 1}` }}
-                      </h5>
+                    <UiInput v-model="item.name" placeholder="이름 (e.g. React)" />
+
+                    <div class="flex items-center gap-2">
+                      <img
+                        v-if="item.icon_url"
+                        :src="item.icon_url"
+                        :alt="item.name"
+                        class="h-6 w-6 shrink-0 object-contain"
+                      />
+                      <span v-if="item.icon_url" class="truncate text-xs text-muted">
+                        {{ item.icon_url.split('/').pop() }}
+                      </span>
+                      <span v-else class="text-xs text-muted">아이콘 없음</span>
+                    </div>
+
+                    <UiButton
+                      size="sm"
+                      variant="subtle"
+                      :icon="Upload"
+                      @click="($refs[`iconInput-${index}`] as HTMLInputElement[])?.[0]?.click()"
+                    >
+                      업로드
+                    </UiButton>
+                    <input
+                      :ref="`iconInput-${index}`"
+                      type="file"
+                      accept="image/svg+xml,image/png,image/webp"
+                      class="hidden"
+                      @change="handleIconUpload(index, $event)"
+                    />
+
+                    <UiButton
+                      color="error"
+                      variant="ghost"
+                      :icon="Trash"
+                      @click="removeTechStackItem(index)"
+                    />
+                  </div>
+                </div>
+
+                <UiEmptyState v-else :icon="CodeXml" label="No tech stack items" />
+              </div>
+            </div>
+          </UiCard>
+        </TabsContent>
+
+        <TabsContent value="featured_projects">
+          <UiCard>
+            <template #header>
+              <div class="flex items-center justify-between gap-3">
+                <h2 class="font-semibold">Featured Projects</h2>
+                <div class="flex items-center gap-2">
+                  <span v-if="lastAutoSavedAt.featured_projects" class="text-xs text-muted">
+                    자동 저장 {{ formatAutoSavedAt(lastAutoSavedAt.featured_projects) }}
+                  </span>
+                  <UiButton size="sm" variant="subtle" :icon="Plus" @click="addProject">
+                    프로젝트 추가
+                  </UiButton>
+                  <UiButton
+                    v-if="hasPortfolio"
+                    size="sm"
+                    :icon="Save"
+                    :loading="savingSection === 'featured_projects'"
+                    @click="handleSaveSection('featured_projects')"
+                  >
+                    저장
+                  </UiButton>
+                </div>
+              </div>
+            </template>
+
+            <AccordionRoot
+              v-if="portfolio.featured_projects.length"
+              v-model="openProjectKeys"
+              type="multiple"
+              class="space-y-4"
+            >
+              <AccordionItem
+                v-for="(project, projectIndex) in portfolio.featured_projects"
+                :key="projectIndex"
+                :value="projectAccordionKey(projectIndex)"
+                class="rounded-xl border border-default p-4"
+              >
+                <AccordionHeader as="div" class="flex items-center justify-between gap-3">
+                  <AccordionTrigger
+                    class="group flex flex-1 cursor-pointer items-center justify-between gap-3 text-left"
+                  >
+                    <h3 class="font-medium">
+                      {{ project.title || project.slug || `Project ${projectIndex + 1}` }}
+                    </h3>
+                    <ChevronDown
+                      class="size-4 shrink-0 text-muted transition-transform group-data-[state=open]:rotate-180"
+                    />
+                  </AccordionTrigger>
+                  <UiTooltip text="삭제">
+                    <UiButton
+                      color="error"
+                      variant="ghost"
+                      :icon="Trash"
+                      @click="removeProject(projectIndex)"
+                    />
+                  </UiTooltip>
+                </AccordionHeader>
+
+                <AccordionContent class="pt-4">
+                  <div class="grid gap-4 sm:grid-cols-2">
+                    <UiFormField label="Slug">
+                      <UiInput v-model="project.slug" />
+                    </UiFormField>
+
+                    <UiFormField label="Title">
+                      <UiInput v-model="project.title" />
+                    </UiFormField>
+
+                    <UiFormField label="Period">
+                      <UiInput v-model="project.period" />
+                    </UiFormField>
+
+                    <UiFormField label="Summary (Markdown)" class="sm:col-span-2">
+                      <PortfolioMarkdownField v-model="project.summary" />
+                    </UiFormField>
+
+                    <UiFormField label="Stack" class="sm:col-span-2">
+                      <UiTagsInput
+                        v-model="project.stack"
+                        placeholder="기술 이름을 입력하고 Enter"
+                      />
+                    </UiFormField>
+
+                    <UiFormField label="Highlights (Markdown list)" class="sm:col-span-2">
+                      <PortfolioMarkdownField v-model="project.highlights_markdown" />
+                    </UiFormField>
+                  </div>
+
+                  <div class="mt-4 rounded-lg border border-default p-4">
+                    <div class="mb-3 flex items-center justify-between gap-3">
+                      <h4 class="font-medium">Links</h4>
+                      <UiButton
+                        size="sm"
+                        variant="subtle"
+                        :icon="Plus"
+                        @click="addProjectLink(projectIndex)"
+                      >
+                        링크 추가
+                      </UiButton>
+                    </div>
+
+                    <div class="space-y-3">
+                      <div
+                        v-for="(link, linkIndex) in project.links"
+                        :key="linkIndex"
+                        class="grid gap-3 sm:grid-cols-[1fr_1fr_auto]"
+                      >
+                        <UiInput v-model="link.label" placeholder="Label" />
+                        <UiInput v-model="link.url" placeholder="URL" />
+                        <UiButton
+                          color="error"
+                          variant="ghost"
+                          :icon="Trash"
+                          @click="removeProjectLink(projectIndex, linkIndex)"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </AccordionRoot>
+
+            <UiEmptyState v-else :icon="FolderOpen" label="No featured projects" />
+          </UiCard>
+        </TabsContent>
+
+        <TabsContent value="career">
+          <UiCard>
+            <template #header>
+              <div class="flex items-center justify-between gap-3">
+                <h2 class="font-semibold">Career</h2>
+                <div class="flex items-center gap-2">
+                  <span v-if="lastAutoSavedAt.career" class="text-xs text-muted">
+                    자동 저장 {{ formatAutoSavedAt(lastAutoSavedAt.career) }}
+                  </span>
+                  <UiButton size="sm" variant="subtle" :icon="Plus" @click="addCareerCompany">
+                    회사 추가
+                  </UiButton>
+                  <UiButton
+                    v-if="hasPortfolio"
+                    size="sm"
+                    :icon="Save"
+                    :loading="savingSection === 'career'"
+                    @click="handleSaveSection('career')"
+                  >
+                    저장
+                  </UiButton>
+                </div>
+              </div>
+            </template>
+
+            <div class="space-y-4">
+              <div class="grid gap-4 sm:grid-cols-2">
+                <UiFormField label="Summary Label">
+                  <UiInput v-model="portfolio.career.summary_label" />
+                </UiFormField>
+
+                <UiFormField label="Summary Value">
+                  <UiInput v-model="portfolio.career.summary_value" />
+                </UiFormField>
+              </div>
+
+              <AccordionRoot
+                v-if="portfolio.career.companies.length"
+                v-model="openCompanyKeys"
+                type="multiple"
+                class="space-y-4"
+              >
+                <AccordionItem
+                  v-for="(company, companyIndex) in portfolio.career.companies"
+                  :key="companyIndex"
+                  :value="companyAccordionKey(companyIndex)"
+                  class="rounded-xl border border-default p-4"
+                >
+                  <AccordionHeader as="div" class="flex items-center justify-between gap-3">
+                    <AccordionTrigger
+                      class="group flex flex-1 cursor-pointer items-center justify-between gap-3 text-left"
+                    >
+                      <h3 class="font-medium">
+                        {{ company.company || `Company ${companyIndex + 1}` }}
+                      </h3>
+                      <ChevronDown
+                        class="size-4 shrink-0 text-muted transition-transform group-data-[state=open]:rotate-180"
+                      />
+                    </AccordionTrigger>
+                    <UiTooltip text="삭제">
                       <UiButton
                         color="error"
                         variant="ghost"
                         :icon="Trash"
-                        @click.prevent="removeCareerItem(companyIndex, itemIndex)"
+                        @click="removeCareerCompany(companyIndex)"
                       />
-                    </summary>
+                    </UiTooltip>
+                  </AccordionHeader>
 
-                    <div class="space-y-4">
-                      <UiFormField label="Title">
-                        <UiInput v-model="item.title" />
+                  <AccordionContent class="pt-4">
+                    <div class="grid gap-4 sm:grid-cols-2">
+                      <UiFormField label="Company">
+                        <UiInput v-model="company.company" />
                       </UiFormField>
 
                       <UiFormField label="Period">
-                        <UiInput v-model="item.period" />
+                        <UiInput v-model="company.period" />
                       </UiFormField>
 
-                      <UiFormField label="Bullets (Markdown list)">
-                        <PortfolioMarkdownField v-model="item.bullets_markdown" />
+                      <UiFormField label="Employment Type">
+                        <UiInput v-model="company.employment_type" />
+                      </UiFormField>
+
+                      <UiFormField label="Role">
+                        <UiInput v-model="company.role" />
+                      </UiFormField>
+
+                      <UiFormField label="Position" class="sm:col-span-2">
+                        <UiInput v-model="company.position" />
                       </UiFormField>
                     </div>
-                  </details>
-                </div>
 
-                <UiEmptyState v-else :icon="BriefcaseBusiness" label="No career items" />
-              </div>
-            </details>
-          </div>
+                    <div class="mt-4 rounded-lg border border-default p-4">
+                      <div class="mb-3 flex items-center justify-between gap-3">
+                        <h4 class="font-medium">Career Items</h4>
+                        <UiButton
+                          size="sm"
+                          variant="subtle"
+                          :icon="Plus"
+                          @click="addCareerItem(companyIndex)"
+                        >
+                          항목 추가
+                        </UiButton>
+                      </div>
 
-          <UiEmptyState v-else :icon="Briefcase" label="No career companies" />
-        </div>
-      </UiCard>
+                      <AccordionRoot
+                        v-if="company.items.length"
+                        v-model="openCareerItemKeys"
+                        type="multiple"
+                        class="space-y-4"
+                      >
+                        <AccordionItem
+                          v-for="(item, itemIndex) in company.items"
+                          :key="itemIndex"
+                          :value="careerItemAccordionKey(companyIndex, itemIndex)"
+                          class="rounded-lg border border-default p-4"
+                        >
+                          <AccordionHeader as="div" class="flex items-center justify-between gap-3">
+                            <AccordionTrigger
+                              class="group flex flex-1 cursor-pointer items-center justify-between gap-3 text-left"
+                            >
+                              <h5 class="font-medium">
+                                {{ item.title || `Item ${itemIndex + 1}` }}
+                              </h5>
+                              <ChevronDown
+                                class="size-4 shrink-0 text-muted transition-transform group-data-[state=open]:rotate-180"
+                              />
+                            </AccordionTrigger>
+                            <UiTooltip text="삭제">
+                              <UiButton
+                                color="error"
+                                variant="ghost"
+                                :icon="Trash"
+                                @click="removeCareerItem(companyIndex, itemIndex)"
+                              />
+                            </UiTooltip>
+                          </AccordionHeader>
+
+                          <AccordionContent class="space-y-4 pt-4">
+                            <UiFormField label="Title">
+                              <UiInput v-model="item.title" />
+                            </UiFormField>
+
+                            <UiFormField label="Period">
+                              <UiInput v-model="item.period" />
+                            </UiFormField>
+
+                            <UiFormField label="Bullets (Markdown list)">
+                              <PortfolioMarkdownField v-model="item.bullets_markdown" />
+                            </UiFormField>
+                          </AccordionContent>
+                        </AccordionItem>
+                      </AccordionRoot>
+
+                      <UiEmptyState v-else :icon="BriefcaseBusiness" label="No career items" />
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </AccordionRoot>
+
+              <UiEmptyState v-else :icon="Briefcase" label="No career companies" />
+            </div>
+          </UiCard>
+        </TabsContent>
+      </TabsRoot>
     </template>
   </div>
 </template>

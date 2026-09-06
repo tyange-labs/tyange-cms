@@ -9,5 +9,7 @@
         <slot />
       </div>
     </UiMain>
+
+    <UiToaster />
   </div>
 </template>

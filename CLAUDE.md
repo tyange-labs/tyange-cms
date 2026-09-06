@@ -8,7 +8,7 @@ Nuxt 4 + Vue 3. bun 사용.
 - Nuxt 4 (4.5.2)
 - Vue 3
 - bun
-- UI: `@nuxt/ui` 없음. `app/components/ui/*`에 직접 만든 컴포넌트(`Ui*` 접두사로 자동 임포트). Select/TagsCombobox/DateInput만 `reka-ui` 프리미티브 사용, 나머지는 순수 Tailwind
+- UI: `@nuxt/ui` 없음. `app/components/ui/*`에 직접 만든 컴포넌트(`Ui*` 접두사로 자동 임포트). Select/TagsCombobox/DateInput/TagsInput/Toaster/Tooltip이 `reka-ui` 프리미티브 사용, 나머지는 순수 Tailwind
 - 아이콘: `lucide-vue-next` 컴포넌트를 직접 import해서 씀 (`icon="i-lucide-x"` 같은 문자열 방식 아님)
 - Lint/Format: `oxlint` + `oxfmt` (ESLint/Prettier 아님). `bun run lint`, `bun run format`
 
@@ -67,15 +67,28 @@ Authorization 헤더를 그대로 실어 cms-api의 `GET /admin/wedding/guests`�
   없는 host 라벨을 가리킴(tyange-dev와 동일 패턴). **Forgejo 쪽 secrets/vars는 자동으로
   안 넘어와서 웹 UI에서 다시 등록해야 하고, 저장소 Settings → Units → Overview에서
   Actions 체크박스도 켜야 워크플로가 인식된다** — 둘 다 아직 확인 안 함
+- 포트폴리오 에디터를 Reka UI로 확장 (2026-09): 5개 섹션을 `Tabs`로 묶고, Featured
+  Projects/Career(회사·세부 항목 3단 중첩까지)를 `<details>`에서 `Accordion`으로,
+  Stack 필드를 textarea+줄바꿈 파싱에서 `TagsInput`으로, 수동 저장 성공 알림을
+  `UiAlert`에서 `Toast`(`default.vue`에 `UiToaster` 마운트, `useToast()` 컴포저블)로,
+  삭제 아이콘 버튼엔 `Tooltip`을 추가로 붙였다. 자동 저장은 계속 무음, 실패는 계속
+  `UiAlert`로 표시(토스트는 성공/수동 저장에만 씀).
 
 ## UI 컴포넌트 (`app/components/ui/`)
 
 `@nuxt/ui`가 `reka-ui`를 내부적으로 고정 버전 물고 있어서 직접 추가하면 버전이 갈릴 위험이 있었다.
 그래서 `@nuxt/ui`를 걷어내고 지금 쓰는 props만 지원하는 얇은 컴포넌트 세트를 직접 만들었다.
 
-- Select / TagsCombobox / DateInput만 `reka-ui` 프리미티브 사용. 나머지(Button/Alert/Badge/Card/
-  EmptyState/FormField/Input/Textarea/Skeleton/Main/Header/NavMenu)는 순수 Tailwind — 헤드리스 동작이
-  필요 없는 표현용 컴포넌트라서.
+- Select / TagsCombobox / DateInput / TagsInput / Toaster / Tooltip이 `reka-ui` 프리미티브 사용.
+  나머지(Button/Alert/Badge/Card/EmptyState/FormField/Input/Textarea/Skeleton/Main/Header/NavMenu)는
+  순수 Tailwind — 헤드리스 동작이 필요 없는 표현용 컴포넌트라서. `Tabs`/`Accordion`은 재사용
+  가능한 Ui* 래퍼를 따로 만들지 않고 `PortfolioEditor.vue`에서 `reka-ui`를 직접 import해 쓴다
+  (섹션/항목마다 내용이 완전히 달라 얇은 래퍼로 감쌀 이점이 없어서).
+- `reka-ui`(Vue)는 컴파운드 컴포넌트가 `<Accordion.Root>`가 아니라 `AccordionRoot`처럼
+  이름 자체에 `Root`가 붙은 **개별 named export**다 — SolidJS Kobalte(`<Accordion>`이 곧
+  루트)와 정반대라 헷갈리기 쉽다. `Toast`는 `ToastRoot`를 `ToastViewport`의 자식으로 안
+  넣어도 된다 — `ToastRoot`가 내부적으로 `Teleport`를 써서 `ToastViewport` DOM에 알아서
+  들어간다(`node_modules/reka-ui/dist/Toast/ToastRootImpl.js` 확인).
 - 시맨틱 토큰(`text-muted`, `bg-elevated`, `border-default`, `bg-primary`, `--header-height`)은
   `app/assets/css/main.css`의 `@theme`에서 직접 정의한다. Nuxt UI 기본 팔레트(primary=green,
   neutral=slate)의 라이트 모드 매핑과 동일하게 맞췄다 — 다크모드는 앱 어디서도 안 써서 라이트 하나만 있다.
