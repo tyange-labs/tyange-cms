@@ -507,6 +507,10 @@ const sectionTabOrder: PortfolioSectionKey[] = [
 ]
 const activeTab = ref<PortfolioSectionKey>('meta')
 
+// 탭을 바꾸면 Featured Projects 탐색기는 항상 루트/폼 닫힘 상태로 되돌린다 —
+// 다른 탭 갔다 돌아왔을 때 이전 폴더 안에 갇혀 있지 않게.
+watch(activeTab, () => resetFinderState())
+
 function buildSectionContent(sectionKey: PortfolioSectionKey) {
   const p = portfolio.value
   if (!p) {
@@ -751,6 +755,7 @@ async function handleDelete() {
             :key="key"
             :value="key"
             class="shrink-0 border-b-2 border-transparent px-1 pb-3 text-sm font-medium text-muted transition-colors hover:text-default data-[state=active]:border-primary data-[state=active]:text-primary"
+            @click="resetFinderState()"
           >
             {{ sectionLabels[key] }}
           </TabsTrigger>
