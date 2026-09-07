@@ -64,8 +64,7 @@ ID/비번 로그인은 **앱 세션 계층**이고, 그 위에 **네트워크 �
 - nginx의 `cms.tyange.com` vhost(공개 + basic auth)는 심링크 해제로 제거했다
   (`/etc/nginx/sites-available/cms.tyange.com` 파일과 `~/cms.tyange.com.nginx.*.bak` 백업은 박스에 남아 있음).
   이제 공개로 `cms.tyange.com`을 치면 nginx 기본 서버로 빠져 인증서 불일치가 난다. 블로그 등 다른 vhost는 그대로 공개.
-- 미정리 항목: 박스의 `/etc/letsencrypt/live/cms.tyange.com` 인증서(갱신 실패 메일 옴 → `certbot delete --cert-name cms.tyange.com`),
-  DNS의 `cms.tyange.com` A 레코드, 박스의 `/etc/nginx/.htpasswd`(더 이상 안 쓰임).
+- 미정리 항목(인증서 정리, DNS 레코드 삭제, `.htpasswd` 제거 등)은 `DEPLOY_TODO.md`에 정리해뒀다.
 - 브라우저는 Nuxt 서버 라우트(`/api/*`)하고만 통신하고 cms-api 호출은 전부 서버 사이드
   `$fetch`라서, 접근 도메인이 바뀌어도 **cms-api CORS 목록은 건드릴 필요 없다**. (`tyange-cms-api`의
   `Cors` 목록에 있는 `https://cms.tyange.com`은 이제 사용되지 않지만 무해해서 그대로 둠.)
