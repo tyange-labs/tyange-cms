@@ -13,8 +13,12 @@ import type { CMSResponse } from '~/types/response.types'
 import {
   Briefcase,
   ChevronDown,
+  ChevronLeft,
   CodeXml,
+  FileText,
+  Folder,
   FolderOpen,
+  FolderPlus,
   Plus,
   RefreshCw,
   Save,
@@ -104,20 +108,121 @@ function getErrorMessage(error: unknown, fallback: string) {
 // 식으로 단순하게 관리한다 — 인덱스 기반 key라 항목 순서가 바뀌면 완벽하게 들어맞진
 // 않지만, 어차피 이 컴포넌트 전체가 인덱스를 key로 쓰고 있어서 그 이상의 정교함은
 // 이 화면에 과한 설계다.
-const openProjectKeys = ref<string[]>([])
 const openCompanyKeys = ref<string[]>([])
 
-function projectAccordionKey(index: number) {
-  return `project-${index}`
-}
 function companyAccordionKey(index: number) {
   return `company-${index}`
 }
 
 function resetOpenAccordionKeys() {
   const p = portfolio.value
-  openProjectKeys.value = p ? p.featured_projects.map((_, index) => projectAccordionKey(index)) : []
   openCompanyKeys.value = (p?.career?.companies ?? []).map((_, index) => companyAccordionKey(index))
+}
+
+// ── Featured Projects: 파일 탐색기(Finder) UI ──
+// featured_projects는 평평한 배열이고 각 프로젝트의 folder 문자열이 그룹을 만든다.
+// currentFolder=null → 루트(폴더 타일 + folder 없는 프로젝트), 값이 있으면 그 폴더 안.
+// selectedIndex → 편집 폼을 연 프로젝트의 featured_projects 인덱스.
+const currentFolder = ref<string | null>(null)
+const selectedIndex = ref<number | null>(null)
+// 프로젝트가 아직 없는 새 폴더 — folder는 프로젝트에만 붙으므로 저장 전까지만 목록에 유지된다.
+const draftFolders = ref<string[]>([])
+const draggingIndex = ref<number | null>(null)
+
+const featuredProjects = computed(() => portfolio.value?.featured_projects ?? [])
+
+const folderNames = computed(() => {
+  const names: string[] = []
+  for (const p of featuredProjects.value) {
+    const f = p.folder?.trim()
+    if (f && !names.includes(f)) names.push(f)
+  }
+  for (const f of draftFolders.value) if (f && !names.includes(f)) names.push(f)
+  return names
+})
+
+function folderCount(name: string) {
+  return featuredProjects.value.filter((p) => p.folder?.trim() === name).length
+}
+
+// { project, index } 목록 — 현재 위치(루트 또는 폴더 안).
+const currentEntries = computed(() =>
+  featuredProjects.value
+    .map((project, index) => ({ project, index }))
+    .filter(({ project }) =>
+      currentFolder.value === null
+        ? !project.folder?.trim()
+        : project.folder?.trim() === currentFolder.value,
+    ),
+)
+
+const selectedProject = computed(() =>
+  selectedIndex.value === null ? null : (featuredProjects.value[selectedIndex.value] ?? null),
+)
+
+function resetFinderState() {
+  currentFolder.value = null
+  selectedIndex.value = null
+  draftFolders.value = []
+  draggingIndex.value = null
+}
+
+function openFolder(name: string) {
+  currentFolder.value = name
+  selectedIndex.value = null
+}
+function goToRoot() {
+  currentFolder.value = null
+  selectedIndex.value = null
+}
+function selectProject(index: number) {
+  selectedIndex.value = index
+}
+function closeForm() {
+  selectedIndex.value = null
+}
+
+function uniqueFolderName(base: string) {
+  if (!folderNames.value.includes(base)) return base
+  let n = 2
+  while (folderNames.value.includes(`${base} ${n}`)) n += 1
+  return `${base} ${n}`
+}
+function addFolder() {
+  const name = uniqueFolderName('새 폴더')
+  draftFolders.value.push(name)
+  openFolder(name)
+}
+function renameFolder(oldName: string, rawNew: string) {
+  const newName = rawNew.trim()
+  if (!newName || newName === oldName) return
+  for (const p of featuredProjects.value) {
+    if (p.folder?.trim() === oldName) p.folder = newName
+  }
+  draftFolders.value = draftFolders.value.map((f) => (f === oldName ? newName : f))
+  if (currentFolder.value === oldName) currentFolder.value = newName
+}
+
+function moveProjectToFolder(index: number, folder: string) {
+  const p = featuredProjects.value[index]
+  if (p) p.folder = folder
+}
+function onTileDrop(folder: string) {
+  if (draggingIndex.value !== null) moveProjectToFolder(draggingIndex.value, folder)
+  draggingIndex.value = null
+}
+
+function onRenameCurrentFolder(rawNew: string) {
+  if (currentFolder.value !== null) renameFolder(currentFolder.value, rawNew)
+}
+function removeSelectedProject() {
+  if (selectedIndex.value !== null) removeProject(selectedIndex.value)
+}
+function addSelectedProjectLink() {
+  if (selectedIndex.value !== null) addProjectLink(selectedIndex.value)
+}
+function removeSelectedProjectLink(linkIndex: number) {
+  if (selectedIndex.value !== null) removeProjectLink(selectedIndex.value, linkIndex)
 }
 
 function assignPortfolio(nextPortfolio?: PortfolioResponse | null) {
@@ -137,6 +242,7 @@ function assignPortfolio(nextPortfolio?: PortfolioResponse | null) {
   }
   portfolio.value = normalized
   resetOpenAccordionKeys()
+  resetFinderState()
 }
 
 // 서버에서 막 받아온 값을 assignPortfolio()가 채워 넣는 동안에는 아래 섹션별
@@ -227,15 +333,18 @@ function createCareerCompany(): PortfolioCareerCompany {
 function addProject() {
   const p = portfolio.value
   if (!p) return
-  p.featured_projects.push(createProject())
-  resetOpenAccordionKeys()
+  const project = createProject()
+  project.folder = currentFolder.value ?? ''
+  p.featured_projects.push(project)
+  selectedIndex.value = p.featured_projects.length - 1
 }
 
 function removeProject(index: number) {
   const p = portfolio.value
   if (!p) return
   p.featured_projects.splice(index, 1)
-  resetOpenAccordionKeys()
+  if (selectedIndex.value === index) selectedIndex.value = null
+  else if (selectedIndex.value !== null && selectedIndex.value > index) selectedIndex.value -= 1
 }
 
 function addProjectLink(projectIndex: number) {
@@ -813,13 +922,38 @@ async function handleDelete() {
           <UiCard>
             <template #header>
               <div class="flex items-center justify-between gap-3">
-                <h2 class="font-semibold">Featured Projects</h2>
-                <div class="flex items-center gap-2">
-                  <span v-if="lastAutoSavedAt.featured_projects" class="text-xs text-muted">
+                <!-- 브레드크럼 (Finder 경로 표시줄) -->
+                <div class="flex min-w-0 items-center gap-1.5">
+                  <button
+                    class="flex shrink-0 items-center gap-1.5 text-sm hover:text-slate-900"
+                    :class="currentFolder === null ? 'font-semibold text-default' : 'text-muted'"
+                    @click="goToRoot"
+                  >
+                    <FolderOpen class="size-4" />
+                    Featured Projects
+                  </button>
+                  <template v-if="currentFolder !== null">
+                    <span class="text-slate-300">/</span>
+                    <input
+                      :value="currentFolder"
+                      class="w-40 rounded-md border border-default px-2 py-1 text-sm font-semibold text-default focus:outline-none focus:ring-1 focus:ring-green-500"
+                      @change="(e) => onRenameCurrentFolder((e.target as HTMLInputElement).value)"
+                    />
+                  </template>
+                </div>
+
+                <div class="flex shrink-0 items-center gap-2">
+                  <span
+                    v-if="lastAutoSavedAt.featured_projects"
+                    class="hidden text-xs text-muted sm:inline"
+                  >
                     자동 저장 {{ formatAutoSavedAt(lastAutoSavedAt.featured_projects) }}
                   </span>
+                  <UiButton size="sm" variant="subtle" :icon="FolderPlus" @click="addFolder">
+                    폴더
+                  </UiButton>
                   <UiButton size="sm" variant="subtle" :icon="Plus" @click="addProject">
-                    프로젝트 추가
+                    프로젝트
                   </UiButton>
                   <UiButton
                     v-if="hasPortfolio"
@@ -834,100 +968,153 @@ async function handleDelete() {
               </div>
             </template>
 
-            <AccordionRoot
-              v-if="portfolio.featured_projects.length"
-              v-model="openProjectKeys"
-              type="multiple"
-              class="space-y-4"
-            >
-              <AccordionItem
-                v-for="(project, projectIndex) in portfolio.featured_projects"
-                :key="projectIndex"
-                :value="projectAccordionKey(projectIndex)"
-                class="rounded-xl border border-default p-4"
-              >
-                <AccordionHeader as="div" class="flex items-center justify-between gap-3">
-                  <AccordionTrigger
-                    class="group flex flex-1 cursor-pointer items-center justify-between gap-3 text-left"
-                  >
-                    <h3 class="font-medium">
-                      {{ project.title || project.slug || `Project ${projectIndex + 1}` }}
-                    </h3>
-                    <ChevronDown
-                      class="size-4 shrink-0 text-muted transition-transform group-data-[state=open]:rotate-180"
-                    />
-                  </AccordionTrigger>
-                  <UiTooltip text="삭제">
-                    <UiButton
-                      color="error"
-                      variant="ghost"
-                      :icon="Trash"
-                      @click="removeProject(projectIndex)"
-                    />
-                  </UiTooltip>
-                </AccordionHeader>
+            <!-- 프로젝트('파일') 선택됨: 왼쪽 목록 + 오른쪽 편집 폼 -->
+            <div v-if="selectedProject" class="grid gap-4 sm:grid-cols-[200px_minmax(0,1fr)]">
+              <div class="rounded-lg border border-default p-1.5">
+                <button
+                  v-for="{ project, index } in currentEntries"
+                  :key="index"
+                  class="flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-left text-sm"
+                  :class="
+                    index === selectedIndex ? 'bg-green-50 text-green-800' : 'hover:bg-elevated'
+                  "
+                  @click="selectProject(index)"
+                >
+                  <FileText class="size-4 shrink-0 text-muted" />
+                  <span class="truncate">
+                    {{ project.title || project.slug || `Project ${index + 1}` }}
+                  </span>
+                </button>
+                <p v-if="!currentEntries.length" class="px-2.5 py-2 text-xs text-muted">
+                  이 위치에 프로젝트가 없습니다.
+                </p>
+              </div>
 
-                <AccordionContent class="pt-4">
-                  <div class="grid gap-4 sm:grid-cols-2">
-                    <UiFormField label="Slug">
-                      <UiInput v-model="project.slug" />
-                    </UiFormField>
-
-                    <UiFormField label="Title">
-                      <UiInput v-model="project.title" />
-                    </UiFormField>
-
-                    <UiFormField label="Period">
-                      <UiInput v-model="project.period" />
-                    </UiFormField>
-
-                    <UiFormField label="Folder">
-                      <UiInput v-model="project.folder" placeholder="예: CMS 시스템" />
-                      <p class="text-xs text-muted">
-                        같은 값을 가진 프로젝트끼리 tyange-dev에서 한 묶음으로 보임. 비우면 단독 카드.
-                      </p>
-                    </UiFormField>
-
-                    <UiFormField label="Description (Markdown)" class="sm:col-span-2">
-                      <PortfolioMarkdownField v-model="project.body_markdown" />
-                    </UiFormField>
-                  </div>
-
-                  <div class="mt-4 rounded-lg border border-default p-4">
-                    <div class="mb-3 flex items-center justify-between gap-3">
-                      <h4 class="font-medium">Links</h4>
+              <div class="space-y-4">
+                <div class="flex items-center justify-between gap-2">
+                  <h3 class="truncate font-semibold">
+                    {{ selectedProject.title || selectedProject.slug || '새 프로젝트' }}
+                  </h3>
+                  <div class="flex shrink-0 items-center gap-1">
+                    <UiButton size="sm" variant="ghost" @click="closeForm">닫기</UiButton>
+                    <UiTooltip text="삭제">
                       <UiButton
-                        size="sm"
-                        variant="subtle"
-                        :icon="Plus"
-                        @click="addProjectLink(projectIndex)"
-                      >
-                        링크 추가
-                      </UiButton>
-                    </div>
+                        color="error"
+                        variant="ghost"
+                        :icon="Trash"
+                        @click="removeSelectedProject"
+                      />
+                    </UiTooltip>
+                  </div>
+                </div>
 
-                    <div class="space-y-3">
-                      <div
-                        v-for="(link, linkIndex) in project.links"
-                        :key="linkIndex"
-                        class="grid gap-3 sm:grid-cols-[1fr_1fr_auto]"
-                      >
-                        <UiInput v-model="link.label" placeholder="Label" />
-                        <UiInput v-model="link.url" placeholder="URL" />
-                        <UiButton
-                          color="error"
-                          variant="ghost"
-                          :icon="Trash"
-                          @click="removeProjectLink(projectIndex, linkIndex)"
-                        />
-                      </div>
+                <div class="grid gap-4 sm:grid-cols-2">
+                  <UiFormField label="Slug">
+                    <UiInput v-model="selectedProject.slug" />
+                  </UiFormField>
+                  <UiFormField label="Title">
+                    <UiInput v-model="selectedProject.title" />
+                  </UiFormField>
+                  <UiFormField label="Period">
+                    <UiInput v-model="selectedProject.period" />
+                  </UiFormField>
+                  <UiFormField label="Folder">
+                    <UiInput v-model="selectedProject.folder" placeholder="예: CMS 시스템" />
+                    <p class="text-xs text-muted">
+                      비우면 폴더 밖(단독 카드). 그리드에서 폴더 위로 끌어다 놔도 이동됩니다.
+                    </p>
+                  </UiFormField>
+                  <UiFormField label="Description (Markdown)" class="sm:col-span-2">
+                    <PortfolioMarkdownField v-model="selectedProject.body_markdown" />
+                  </UiFormField>
+                </div>
+
+                <div class="rounded-lg border border-default p-4">
+                  <div class="mb-3 flex items-center justify-between gap-3">
+                    <h4 class="font-medium">Links</h4>
+                    <UiButton
+                      size="sm"
+                      variant="subtle"
+                      :icon="Plus"
+                      @click="addSelectedProjectLink"
+                    >
+                      링크 추가
+                    </UiButton>
+                  </div>
+                  <div class="space-y-3">
+                    <div
+                      v-for="(link, linkIndex) in selectedProject.links"
+                      :key="linkIndex"
+                      class="grid gap-3 sm:grid-cols-[1fr_1fr_auto]"
+                    >
+                      <UiInput v-model="link.label" placeholder="Label" />
+                      <UiInput v-model="link.url" placeholder="URL" />
+                      <UiButton
+                        color="error"
+                        variant="ghost"
+                        :icon="Trash"
+                        @click="removeSelectedProjectLink(linkIndex)"
+                      />
                     </div>
                   </div>
-                </AccordionContent>
-              </AccordionItem>
-            </AccordionRoot>
+                </div>
+              </div>
+            </div>
 
-            <UiEmptyState v-else :icon="FolderOpen" label="No featured projects" />
+            <!-- 선택 없음: 아이콘 그리드 -->
+            <div v-else>
+              <div
+                v-if="(currentFolder === null && folderNames.length) || currentEntries.length"
+                class="grid grid-cols-3 gap-2 sm:grid-cols-4"
+              >
+                <button
+                  v-for="name in currentFolder === null ? folderNames : []"
+                  :key="'folder-' + name"
+                  class="flex flex-col items-center gap-1.5 rounded-xl border border-default p-4 text-center hover:bg-elevated"
+                  @click="openFolder(name)"
+                  @dragover.prevent
+                  @drop="onTileDrop(name)"
+                >
+                  <Folder class="size-11 text-green-500" :stroke-width="1.25" />
+                  <span class="w-full truncate text-sm font-semibold text-default">{{ name }}</span>
+                  <span class="text-xs text-muted">{{ folderCount(name) }}개</span>
+                </button>
+
+                <button
+                  v-for="{ project, index } in currentEntries"
+                  :key="'file-' + index"
+                  class="flex flex-col items-center gap-1.5 rounded-xl border border-transparent p-4 text-center hover:bg-elevated"
+                  draggable="true"
+                  @dragstart="draggingIndex = index"
+                  @dragend="draggingIndex = null"
+                  @click="selectProject(index)"
+                >
+                  <FileText class="size-10 text-slate-400" :stroke-width="1.25" />
+                  <span class="w-full truncate text-sm font-medium text-default">
+                    {{ project.title || project.slug || `Project ${index + 1}` }}
+                  </span>
+                  <span class="w-full truncate text-xs text-muted">{{ project.slug || '—' }}</span>
+                </button>
+              </div>
+
+              <UiEmptyState v-else :icon="FolderOpen" label="비어 있습니다" />
+
+              <div
+                v-if="currentFolder !== null"
+                class="mt-3 flex flex-wrap items-center gap-2 text-sm text-muted"
+              >
+                <button class="flex items-center gap-1 hover:text-default" @click="goToRoot">
+                  <ChevronLeft class="size-4" /> Featured Projects
+                </button>
+                <span
+                  class="rounded-md border border-dashed border-default px-2 py-1 text-xs"
+                  @dragover.prevent
+                  @drop="onTileDrop('')"
+                >
+                  여기로 끌어다 놓으면 폴더에서 빼기
+                </span>
+              </div>
+            </div>
           </UiCard>
         </TabsContent>
 

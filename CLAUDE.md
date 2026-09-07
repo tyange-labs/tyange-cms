@@ -98,6 +98,13 @@ ID/비번 로그인은 **앱 세션 계층**이고, 그 위에 **네트워크 �
 - API에서 가계부/1:1 매칭/RSS/API Key 인증 제거됨 — CMS는 포스트/포트폴리오/태그/이미지 운영에 집중
 - `@nuxt/ui` 제거하고 Reka UI 기반 자체 컴포넌트로 전면 교체, Nuxt 4.5.2로 업그레이드 (2026-09)
 - ESLint(`@antfu/eslint-config`) 제거, `oxlint`/`oxfmt`로 전환 (2026-09)
+- `ssr: false` — 앱 전체 SPA (2026-09). Tailscale로 가둔 인증 전용 도구라 SSR 이득이 없고,
+  하이드레이션 불일치 + SSR 전용 크래시(reka-ui ToastPortal)만 났다. `/api/*` Nitro 라우트는 그대로.
+- Featured Projects 에디터를 파일 탐색기(Finder) UI로 (2026-09) — Accordion 리스트 대신
+  `PortfolioEditor.vue` 안에서 `currentFolder`/`selectedIndex` 상태로 폴더 아이콘 그리드 →
+  폴더 진입 → 파일(프로젝트) 선택 → 2-pane 편집 폼. 폴더 = `project.folder` 문자열(레지스트리
+  없음), 새 폴더는 `draftFolders`로 저장 전까지만 유지. 드래그(파일 타일 → 폴더 타일/드롭존)로
+  folder 이동. `summary`+`highlights_markdown`은 `body_markdown` 하나로 병합됨(cms-api CLAUDE.md).
 - CI를 GitHub Actions에서 Forgejo Actions로 전환 (2026-09) — `.github/workflows` 삭제,
   `.forgejo/workflows/deploy.yml`로 이전. `uses:`는 전부 `https://github.com/...` 완전한
   URL로 써야 함(`data.forgejo.org` 기본 레지스트리엔 `oven-sh/setup-bun` 같은 서드파티
