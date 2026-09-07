@@ -21,20 +21,14 @@ export interface PortfolioProject {
   links: PortfolioLink[]
 }
 
-export interface PortfolioCareerItem {
-  title: string
-  period?: string | null
-  /** Markdown 불릿 리스트. 예전 bullets: string[]을 대체(2026-09). */
-  bullets_markdown: string
-}
-
 export interface PortfolioCareerCompany {
   company: string
   period: string
   employment_type: string
   role: string
   position: string
-  items: PortfolioCareerItem[]
+  /** 회사별 세부 경력을 통째로 담는 Markdown. 예전 items: PortfolioCareerItem[]을 대체(2026-09). */
+  career_items_markdown: string
 }
 
 export interface PortfolioCareerSection {
@@ -104,10 +98,7 @@ export function normalizePortfolioDocument(
           summary_value: document.career.summary_value ?? '',
           companies: (document.career.companies ?? []).map((company) => ({
             ...company,
-            items: (company.items ?? []).map((item) => ({
-              ...item,
-              bullets_markdown: item.bullets_markdown ?? '',
-            })),
+            career_items_markdown: company.career_items_markdown ?? '',
           })),
         }
       : undefined,

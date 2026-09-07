@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type {
   PortfolioCareerCompany,
-  PortfolioCareerItem,
   PortfolioDocument,
   PortfolioIntroSection,
   PortfolioLink,
@@ -13,7 +12,6 @@ import type {
 import type { CMSResponse } from '~/types/response.types'
 import {
   Briefcase,
-  BriefcaseBusiness,
   ChevronDown,
   CodeXml,
   FolderOpen,
@@ -108,7 +106,6 @@ function getErrorMessage(error: unknown, fallback: string) {
 // 이 화면에 과한 설계다.
 const openProjectKeys = ref<string[]>([])
 const openCompanyKeys = ref<string[]>([])
-const openCareerItemKeys = ref<string[]>([])
 
 function projectAccordionKey(index: number) {
   return `project-${index}`
@@ -116,19 +113,11 @@ function projectAccordionKey(index: number) {
 function companyAccordionKey(index: number) {
   return `company-${index}`
 }
-function careerItemAccordionKey(companyIndex: number, itemIndex: number) {
-  return `item-${companyIndex}-${itemIndex}`
-}
 
 function resetOpenAccordionKeys() {
   const p = portfolio.value
   openProjectKeys.value = p ? p.featured_projects.map((_, index) => projectAccordionKey(index)) : []
-
-  const companies = p?.career?.companies ?? []
-  openCompanyKeys.value = companies.map((_, index) => companyAccordionKey(index))
-  openCareerItemKeys.value = companies.flatMap((company, companyIndex) =>
-    company.items.map((_, itemIndex) => careerItemAccordionKey(companyIndex, itemIndex)),
-  )
+  openCompanyKeys.value = (p?.career?.companies ?? []).map((_, index) => companyAccordionKey(index))
 }
 
 function assignPortfolio(nextPortfolio?: PortfolioResponse | null) {
@@ -225,14 +214,6 @@ function createProject(): PortfolioProject {
   }
 }
 
-function createCareerItem(): PortfolioCareerItem {
-  return {
-    title: '',
-    period: '',
-    bullets_markdown: '',
-  }
-}
-
 function createCareerCompany(): PortfolioCareerCompany {
   return {
     company: '',
@@ -240,7 +221,7 @@ function createCareerCompany(): PortfolioCareerCompany {
     employment_type: '',
     role: '',
     position: '',
-    items: [createCareerItem()],
+    career_items_markdown: '',
   }
 }
 
@@ -284,24 +265,6 @@ function removeCareerCompany(index: number) {
   if (!p) return
   const career = p.career ?? { summary_label: '', summary_value: '', companies: [] }
   career.companies.splice(index, 1)
-  p.career = career
-  resetOpenAccordionKeys()
-}
-
-function addCareerItem(companyIndex: number) {
-  const p = portfolio.value
-  if (!p) return
-  const career = p.career ?? { summary_label: '', summary_value: '', companies: [] }
-  career.companies[companyIndex].items.push(createCareerItem())
-  p.career = career
-  resetOpenAccordionKeys()
-}
-
-function removeCareerItem(companyIndex: number, itemIndex: number) {
-  const p = portfolio.value
-  if (!p) return
-  const career = p.career ?? { summary_label: '', summary_value: '', companies: [] }
-  career.companies[companyIndex].items.splice(itemIndex, 1)
   p.career = career
   resetOpenAccordionKeys()
 }
@@ -1065,70 +1028,9 @@ async function handleDelete() {
                       </UiFormField>
                     </div>
 
-                    <div class="mt-4 rounded-lg border border-default p-4">
-                      <div class="mb-3 flex items-center justify-between gap-3">
-                        <h4 class="font-medium">Career Items</h4>
-                        <UiButton
-                          size="sm"
-                          variant="subtle"
-                          :icon="Plus"
-                          @click="addCareerItem(companyIndex)"
-                        >
-                          항목 추가
-                        </UiButton>
-                      </div>
-
-                      <AccordionRoot
-                        v-if="company.items.length"
-                        v-model="openCareerItemKeys"
-                        type="multiple"
-                        class="space-y-4"
-                      >
-                        <AccordionItem
-                          v-for="(item, itemIndex) in company.items"
-                          :key="itemIndex"
-                          :value="careerItemAccordionKey(companyIndex, itemIndex)"
-                          class="rounded-lg border border-default p-4"
-                        >
-                          <AccordionHeader as="div" class="flex items-center justify-between gap-3">
-                            <AccordionTrigger
-                              class="group flex flex-1 cursor-pointer items-center justify-between gap-3 text-left"
-                            >
-                              <h5 class="font-medium">
-                                {{ item.title || `Item ${itemIndex + 1}` }}
-                              </h5>
-                              <ChevronDown
-                                class="size-4 shrink-0 text-muted transition-transform group-data-[state=open]:rotate-180"
-                              />
-                            </AccordionTrigger>
-                            <UiTooltip text="삭제">
-                              <UiButton
-                                color="error"
-                                variant="ghost"
-                                :icon="Trash"
-                                @click="removeCareerItem(companyIndex, itemIndex)"
-                              />
-                            </UiTooltip>
-                          </AccordionHeader>
-
-                          <AccordionContent class="space-y-4 pt-4">
-                            <UiFormField label="Title">
-                              <UiInput v-model="item.title" />
-                            </UiFormField>
-
-                            <UiFormField label="Period">
-                              <UiInput v-model="item.period" />
-                            </UiFormField>
-
-                            <UiFormField label="Bullets (Markdown list)">
-                              <PortfolioMarkdownField v-model="item.bullets_markdown" />
-                            </UiFormField>
-                          </AccordionContent>
-                        </AccordionItem>
-                      </AccordionRoot>
-
-                      <UiEmptyState v-else :icon="BriefcaseBusiness" label="No career items" />
-                    </div>
+                    <UiFormField label="Career Items (Markdown)" class="mt-4">
+                      <PortfolioMarkdownField v-model="company.career_items_markdown" />
+                    </UiFormField>
                   </AccordionContent>
                 </AccordionItem>
               </AccordionRoot>
