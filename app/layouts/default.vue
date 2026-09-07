@@ -10,6 +10,10 @@
       </div>
     </UiMain>
 
-    <UiToaster />
+    <!-- reka-ui ToastPortal이 SSR에서 크래시(Cannot read properties of null 'ce')한다.
+         토스트는 하이드레이션 후에만 필요하므로 ClientOnly로 감싼다. -->
+    <ClientOnly>
+      <UiToaster />
+    </ClientOnly>
   </div>
 </template>
