@@ -13,10 +13,8 @@ export interface PortfolioProject {
   slug: string
   title: string
   period: string
-  /** Markdown. */
-  summary: string
-  /** Markdown 불릿 리스트(`- 항목` 줄바꿈). 예전 highlights: string[]을 대체(2026-09). */
-  highlights_markdown: string
+  /** 프로젝트 설명 전체(문단 + 불릿) Markdown. 예전 summary + highlights_markdown 두 필드를 병합(2026-09). */
+  body_markdown: string
   links: PortfolioLink[]
   /** 이 프로젝트가 속한 폴더 이름. 같은 값끼리 tyange-dev에서 한 묶음으로 렌더된다.
    * 빈 문자열이면 단독 카드. 예전 stack: string[]을 대체(2026-09). */
@@ -90,7 +88,7 @@ export function normalizePortfolioDocument(
     },
     featured_projects: (document.featured_projects ?? []).map((project) => ({
       ...project,
-      highlights_markdown: project.highlights_markdown ?? '',
+      body_markdown: project.body_markdown ?? '',
       folder: project.folder ?? '',
       links: (project.links ?? []).map((link) => ({ ...link })),
     })),

@@ -207,8 +207,7 @@ function createProject(): PortfolioProject {
     slug: '',
     title: '',
     period: '',
-    summary: '',
-    highlights_markdown: '',
+    body_markdown: '',
     links: [createLink()],
     folder: '',
   }
@@ -889,12 +888,8 @@ async function handleDelete() {
                       </p>
                     </UiFormField>
 
-                    <UiFormField label="Summary (Markdown)" class="sm:col-span-2">
-                      <PortfolioMarkdownField v-model="project.summary" />
-                    </UiFormField>
-
-                    <UiFormField label="Highlights (Markdown list)" class="sm:col-span-2">
-                      <PortfolioMarkdownField v-model="project.highlights_markdown" />
+                    <UiFormField label="Description (Markdown)" class="sm:col-span-2">
+                      <PortfolioMarkdownField v-model="project.body_markdown" />
                     </UiFormField>
                   </div>
 

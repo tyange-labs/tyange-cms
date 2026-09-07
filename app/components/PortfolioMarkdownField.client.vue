@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// 포트폴리오의 "글" 성격 필드(intro.content, project.summary,
-// project.highlights_markdown, company.career_items_markdown)를 편집하는 공용
+// 포트폴리오의 "글" 성격 필드(intro.content, project.body_markdown,
+// company.career_items_markdown)를 편집하는 공용
 // markdown 에디터. 블로그 포스트 에디터(Editor.client.vue)와 같은 md-editor-v3를
 // 쓰지만, 여기 필드들은 짧은 문단/불릿 리스트라 이미지 업로드·표·수식·미리보기
 // 전체화면 같은 무거운 툴바 항목은 뺐다.
