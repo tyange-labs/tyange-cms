@@ -15,10 +15,12 @@ export interface PortfolioProject {
   period: string
   /** Markdown. */
   summary: string
-  stack: string[]
   /** Markdown 불릿 리스트(`- 항목` 줄바꿈). 예전 highlights: string[]을 대체(2026-09). */
   highlights_markdown: string
   links: PortfolioLink[]
+  /** 이 프로젝트가 속한 폴더 이름. 같은 값끼리 tyange-dev에서 한 묶음으로 렌더된다.
+   * 빈 문자열이면 단독 카드. 예전 stack: string[]을 대체(2026-09). */
+  folder: string
 }
 
 export interface PortfolioCareerCompany {
@@ -88,8 +90,8 @@ export function normalizePortfolioDocument(
     },
     featured_projects: (document.featured_projects ?? []).map((project) => ({
       ...project,
-      stack: [...(project.stack ?? [])],
       highlights_markdown: project.highlights_markdown ?? '',
+      folder: project.folder ?? '',
       links: (project.links ?? []).map((link) => ({ ...link })),
     })),
     career: document.career

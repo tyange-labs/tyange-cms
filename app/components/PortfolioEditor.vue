@@ -208,9 +208,9 @@ function createProject(): PortfolioProject {
     title: '',
     period: '',
     summary: '',
-    stack: [],
     highlights_markdown: '',
     links: [createLink()],
+    folder: '',
   }
 }
 
@@ -882,15 +882,15 @@ async function handleDelete() {
                       <UiInput v-model="project.period" />
                     </UiFormField>
 
-                    <UiFormField label="Summary (Markdown)" class="sm:col-span-2">
-                      <PortfolioMarkdownField v-model="project.summary" />
+                    <UiFormField label="Folder">
+                      <UiInput v-model="project.folder" placeholder="예: CMS 시스템" />
+                      <p class="text-xs text-muted">
+                        같은 값을 가진 프로젝트끼리 tyange-dev에서 한 묶음으로 보임. 비우면 단독 카드.
+                      </p>
                     </UiFormField>
 
-                    <UiFormField label="Stack" class="sm:col-span-2">
-                      <UiTagsInput
-                        v-model="project.stack"
-                        placeholder="기술 이름을 입력하고 Enter"
-                      />
+                    <UiFormField label="Summary (Markdown)" class="sm:col-span-2">
+                      <PortfolioMarkdownField v-model="project.summary" />
                     </UiFormField>
 
                     <UiFormField label="Highlights (Markdown list)" class="sm:col-span-2">
