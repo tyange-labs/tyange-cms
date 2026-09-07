@@ -4,7 +4,6 @@ import { expect, test } from '@nuxt/test-utils/playwright'
 const authState = {
   isAuth: true,
   accessToken: 'playwright-access-token',
-  refreshToken: 'playwright-refresh-token',
   userRole: 'admin',
 }
 

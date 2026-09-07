@@ -11,7 +11,6 @@ export default defineEventHandler(async (event) => {
 
     return {
       access_token: 'dev-access-token',
-      refresh_token: 'dev-refresh-token',
       user_role: 'admin',
     }
   }

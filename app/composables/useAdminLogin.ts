@@ -62,7 +62,6 @@ export function useAdminLogin() {
     authStore.$patch({
       isAuth: true,
       accessToken: response.access_token,
-      refreshToken: response.refresh_token,
       userRole: response.user_role,
     })
 
@@ -89,10 +88,6 @@ export function useAdminLogin() {
 
     if (status === 401) {
       return '인증에 실패했습니다. 계정을 다시 확인해 주세요.'
-    }
-
-    if (status === 409) {
-      return message || '이미 다른 로그인 방식에 연결된 계정입니다.'
     }
 
     if (status === 500) {

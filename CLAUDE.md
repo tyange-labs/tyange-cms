@@ -33,9 +33,44 @@ Authorization 헤더를 그대로 실어 cms-api의 `GET /admin/wedding/guests`�
 
 ## 로그인
 
-**ID / 비밀번호 하나뿐이다.** Google 로그인은 걷어냈다 — 화면, `/api/login/google` 프록시,
-`googleClientId` 런타임 설정, 배포 워크플로의 `NUXT_PUBLIC_GOOGLE_CLIENT_ID` 주입까지 전부.
-`tyange-cms-api` 쪽 `POST /login/google`은 아직 살아 있지만 CMS는 더 이상 호출하지 않는다.
+**ID / 비밀번호 하나뿐이다.** Google 로그인은 양쪽 다 완전히 제거됐다 (CMS: 화면 / `/api/login/google`
+프록시 / `googleClientId` / 워크플로의 `NUXT_PUBLIC_GOOGLE_CLIENT_ID`. cms-api: `auth/google.rs`,
+`routes/login_google.rs` 삭제 — cms-api CLAUDE.md 참고).
+
+### 세션 유지
+
+로그인 성공 시 받는 건 **access token 하나**다 (`{ access_token, user_role }`). refresh token은
+발급만 되고 검증하는 엔드포인트가 없어서 dead였고, 양쪽에서 제거했다 (2026-09).
+
+- access token JWT의 exp는 **1년** (`tyange-cms-api`의 `create_access_token`).
+- `useAuthStore`(`persist`)는 `piniaPluginPersistedstate.cookies({ maxAge: 1년 })`로 `auth`
+  쿠키에 저장한다. localStorage가 아니라 쿠키인 이유: `middleware/auth.ts`와 페이지들이
+  SSR이라 서버 렌더 시점에 토큰이 읽혀야 한다.
+- 결과적으로 Tailscale만 켜져 있으면 약 1년간 재로그인 없이 CMS에 바로 들어간다. 네트워크
+  차단은 Tailscale이 하니까 앱 세션은 오래 살려도 된다는 전제.
+- e2e(`tests/playwright/dashboard-layout.spec.ts`)는 `auth` 쿠키에 `{ isAuth, accessToken,
+  userRole }` JSON을 직접 주입해서 로그인 화면을 건너뛴다.
+
+### 접근 제한 (Tailscale)
+
+ID/비번 로그인은 **앱 세션 계층**이고, 그 위에 **네트워크 도달 자체를 제한**하는 계층이 따로 있다.
+예전엔 nginx가 CMS vhost에 basic auth를 걸어 막았는데, Tailscale로 옮겼다 (2026-09, 완료).
+
+**접근 경로: `https://cms.tail7710bc.ts.net` (tailnet 전용).** 공개 `cms.tyange.com`은 없어졌다.
+
+- Lightsail 박스가 tailnet에 가입돼 있다 (`usun16@` 계정, MagicDNS 이름 `cms`, `100.96.219.103`).
+- 박스에서 `tailscale serve --bg 3001`로 `https://cms.tail7710bc.ts.net` → `127.0.0.1:3001`
+  프록시가 떠 있다 (`tailnet only`, Funnel 아님). 인증서는 Tailscale가 자동 발급/갱신.
+- nginx의 `cms.tyange.com` vhost(공개 + basic auth)는 심링크 해제로 제거했다
+  (`/etc/nginx/sites-available/cms.tyange.com` 파일과 `~/cms.tyange.com.nginx.*.bak` 백업은 박스에 남아 있음).
+  이제 공개로 `cms.tyange.com`을 치면 nginx 기본 서버로 빠져 인증서 불일치가 난다. 블로그 등 다른 vhost는 그대로 공개.
+- 미정리 항목: 박스의 `/etc/letsencrypt/live/cms.tyange.com` 인증서(갱신 실패 메일 옴 → `certbot delete --cert-name cms.tyange.com`),
+  DNS의 `cms.tyange.com` A 레코드, 박스의 `/etc/nginx/.htpasswd`(더 이상 안 쓰임).
+- 브라우저는 Nuxt 서버 라우트(`/api/*`)하고만 통신하고 cms-api 호출은 전부 서버 사이드
+  `$fetch`라서, 접근 도메인이 바뀌어도 **cms-api CORS 목록은 건드릴 필요 없다**. (`tyange-cms-api`의
+  `Cors` 목록에 있는 `https://cms.tyange.com`은 이제 사용되지 않지만 무해해서 그대로 둠.)
+- 배포 워크플로는 `secrets.HOST`로 SSH(22번) 하는데 이건 공개로 남겨둠 — vhost만 tailnet
+  전용으로 잠가도 배포는 그대로 동작. 박스에서 `tailscale up --ssh`로 Tailscale SSH도 켜져 있다.
 
 ### 로컬 개발용 로그인 우회
 
@@ -56,6 +91,10 @@ Authorization 헤더를 그대로 실어 cms-api의 `GET /admin/wedding/guests`�
 - 운영 중
 - 하객 명단 페이지 추가 (lovelog RSVP 조회)
 - Google 로그인 제거, ID/비밀번호 로그인만 사용
+- refresh token 제거, access token exp 1년 + `auth` 쿠키 maxAge 1년으로 세션 장기 유지 (2026-09).
+  자세한 건 `## 로그인 > 세션 유지` 참고
+- 콘솔 접근 제한을 nginx basic auth → Tailscale로 이전 완료 (2026-09). 접근은
+  `https://cms.tail7710bc.ts.net` (tailnet 전용), 공개 `cms.tyange.com` vhost 제거됨. 자세한 건 `## 로그인` 절 참고
 - 포트폴리오 편집은 섹션별 저장(`PUT /portfolio/sections/:section_key`, 섹션 키: meta / identity / intro / featured_projects / career) 사용, 최초 생성만 전체 문서 PUT
 - API에서 가계부/1:1 매칭/RSS/API Key 인증 제거됨 — CMS는 포스트/포트폴리오/태그/이미지 운영에 집중
 - `@nuxt/ui` 제거하고 Reka UI 기반 자체 컴포넌트로 전면 교체, Nuxt 4.5.2로 업그레이드 (2026-09)
