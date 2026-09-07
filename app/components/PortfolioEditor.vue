@@ -498,14 +498,16 @@ const sectionLabels: Record<PortfolioSectionKey, string> = {
   featured_projects: 'Featured Projects',
   career: 'Career',
 }
+// dev.tyange.com에 표시되는 순서: (헤더) identity → intro → career → 개인 프로젝트.
+// meta(Basic = slug/version 등 문서 메타)는 사이트에 안 나오므로 맨 뒤.
 const sectionTabOrder: PortfolioSectionKey[] = [
-  'meta',
   'identity',
   'intro',
-  'featured_projects',
   'career',
+  'featured_projects',
+  'meta',
 ]
-const activeTab = ref<PortfolioSectionKey>('meta')
+const activeTab = ref<PortfolioSectionKey>('identity')
 
 // 탭을 바꾸면 Featured Projects 탐색기는 항상 루트/폼 닫힘 상태로 되돌린다 —
 // 다른 탭 갔다 돌아왔을 때 이전 폴더 안에 갇혀 있지 않게.
@@ -856,12 +858,15 @@ async function handleDelete() {
             </template>
 
             <div class="space-y-6">
-              <UiFormField label="Content (Markdown)">
+              <!-- UiFormField(<label>)로 감싸면 md-editor-v3 내부의 숨은 <input type="file">이
+                   라벨 클릭 대상이 돼서 에디터를 누를 때마다 파일 선택창이 뜬다. div로 감싼다. -->
+              <div class="space-y-1">
+                <span class="block text-sm font-medium">Content (Markdown)</span>
                 <PortfolioMarkdownField
                   v-model="portfolio.intro.content"
                   placeholder="마크다운으로 인트로 텍스트를 작성하세요."
                 />
-              </UiFormField>
+              </div>
 
               <div>
                 <div class="mb-3 flex items-center justify-between gap-3">
@@ -1029,9 +1034,10 @@ async function handleDelete() {
                       비우면 폴더 밖(단독 카드). 그리드에서 폴더 위로 끌어다 놔도 이동됩니다.
                     </p>
                   </UiFormField>
-                  <UiFormField label="Description (Markdown)" class="sm:col-span-2">
+                  <div class="space-y-1 sm:col-span-2">
+                    <span class="block text-sm font-medium">Description (Markdown)</span>
                     <PortfolioMarkdownField v-model="selectedProject.body_markdown" />
-                  </UiFormField>
+                  </div>
                 </div>
 
                 <div class="rounded-lg border border-default p-4">
@@ -1215,9 +1221,10 @@ async function handleDelete() {
                       </UiFormField>
                     </div>
 
-                    <UiFormField label="Career Items (Markdown)" class="mt-4">
+                    <div class="mt-4 space-y-1">
+                      <span class="block text-sm font-medium">Career Items (Markdown)</span>
                       <PortfolioMarkdownField v-model="company.career_items_markdown" />
-                    </UiFormField>
+                    </div>
                   </AccordionContent>
                 </AccordionItem>
               </AccordionRoot>
