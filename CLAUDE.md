@@ -124,18 +124,17 @@ ID/비번 로그인은 **앱 세션 계층**이고, 그 위에 **네트워크 �
 `@nuxt/ui`가 `reka-ui`를 내부적으로 고정 버전 물고 있어서 직접 추가하면 버전이 갈릴 위험이 있었다.
 그래서 `@nuxt/ui`를 걷어내고 지금 쓰는 props만 지원하는 얇은 컴포넌트 세트를 직접 만들었다.
 
-- Select / TagsCombobox / DateInput / TagsInput / Toaster / Tooltip / ScrollArea가 `reka-ui` 프리미티브 사용.
-  나머지(Button/Alert/Badge/Card/EmptyState/FormField/Input/Textarea/Skeleton/Main/NavMenu)는
+- Select / TagsCombobox / DateInput / TagsInput / Toaster / Tooltip / NavMenu가 `reka-ui` 프리미티브 사용.
+  나머지(Button/Alert/Badge/Card/EmptyState/FormField/Input/Textarea/Skeleton/Main/Header)는
   순수 Tailwind — 헤드리스 동작이 필요 없는 표현용 컴포넌트라서. `Tabs`/`Accordion`은 재사용
   가능한 Ui* 래퍼를 따로 만들지 않고 `PortfolioEditor.vue`에서 `reka-ui`를 직접 import해 쓴다
   (섹션/항목마다 내용이 완전히 달라 얇은 래퍼로 감쌀 이점이 없어서).
-- `Header`는 좁은 화면에서 title+nav가 넘칠 때 `UiScrollArea`(가로)로 감싸 스크롤한다(2026-09,
-  모바일 nav 텍스트가 글자 단위로 줄바꿈되던 버그 수정). `NavMenu`의 각 링크에는 `shrink-0`과
-  `whitespace-nowrap`이 필요하다 — 없으면 flex item이 줄어들며 텍스트가 찌그러진다.
-  `ScrollAreaRoot`에 `self-stretch`로 부모 높이를 강제로 채우면 안 된다 — reka-ui가 뷰포트 안에
-  주입하는 래퍼 div가 높이를 지정하지 않아서 안쪽 콘텐츠의 `h-full`이 percentage-height 순환
-  참조로 무시되고 상단에 붙어버린다(우측 영역과 수직 정렬 어긋남). `ScrollAreaRoot`는 auto
-  height로 두고, 바깥 flex의 `items-center`가 전체를 정렬하게 둔다.
+- `NavMenu`는 `md`(768px) 미만에서 인라인 nav 대신 햄버거 트리거 + `DropdownMenu` 오버레이로
+  전환된다(2026-09, 모바일에서 nav 텍스트가 글자 단위로 줄바꿈되던 버그 수정). 처음엔
+  `overflow-x-auto`+`shrink-0`로 가로 스크롤시키는 안, 그다음 `reka-ui` `ScrollArea`로 스크롤바만
+  스타일링하는 안을 시도했지만 둘 다 UX가 별로라 폐기하고 햄버거/오버레이로 최종 정리했다. `md`
+  breakpoint는 title+nav 4개 항목+우측 액션이 한 줄에 다 들어가는 데 필요한 최소 폭(약 640px)에
+  여유를 더한 값이라 헤더 `max-w-3xl`(768px) 안에서는 절대 줄바꿈/잘림이 안 난다.
 - `reka-ui`(Vue)는 컴파운드 컴포넌트가 `<Accordion.Root>`가 아니라 `AccordionRoot`처럼
   이름 자체에 `Root`가 붙은 **개별 named export**다 — SolidJS Kobalte(`<Accordion>`이 곧
   루트)와 정반대라 헷갈리기 쉽다. `Toast`는 `ToastRoot`를 `ToastViewport`의 자식으로 안
