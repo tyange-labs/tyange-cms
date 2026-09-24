@@ -17,6 +17,19 @@ Nuxt 4 + Vue 3. bun 사용.
 - 백엔드: `tyange-cms-api` (Rust + Poem)
 - API 변경 시 반드시 tyange-cms와 동기화 필요
 
+## lovelog 짧은 글 (`app/utils/short-form.ts`)
+
+lovelog(lovelog.tyange.com)는 `general` 카테고리의 `love`/`lovelog` 태그가 붙고
+`published_at`이 `SHORT_FORM_SINCE`(2026-09-23) 이후인 글을 200자짜리 짧은 글로 보여준다.
+에디터가 이 조건에 맞는 글에 한해:
+
+- 본문 아래에 `N / 200` 카운터를 띄운다. 글자 수는 lovelog와 같은 `plainLength`(마크다운 문법 제외)로 센다.
+- 200자를 넘기면 **published 상태로는 저장하지 않는다** (자동 저장·SAVE 버튼 모두). draft는 그대로 자동 저장돼
+  쓰던 글을 잃지 않는다.
+- 짧은 글은 제목 없이 쓴다. 제목이 비어 있으면 포스트 목록에 "제목 없음"으로 표시한다.
+
+기준일·글자 수·태그 조건은 lovelog `src/lib/timeline.ts`·`src/lib/cms.ts`와 각자 들고 있으니 **함께 고친다.**
+
 ## 하객 명단 (`/wedding-guests`)
 
 lovelog 청첩장 RSVP를 보는 관리자 페이지. `server/api/wedding-guests/index.ts`가

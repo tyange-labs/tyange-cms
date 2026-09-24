@@ -136,9 +136,10 @@ async function handleDeletePost(postId: string) {
         body-class="flex items-start justify-between gap-4"
       >
         <NuxtLink :to="`/managing-blog/update/${post.post_id}`" class="flex-1 min-w-0 space-y-2">
-          <h2 class="font-semibold truncate">
+          <h2 v-if="post.title.trim()" class="font-semibold truncate">
             {{ post.title }}
           </h2>
+          <h2 v-else class="font-semibold italic text-muted">제목 없음</h2>
           <p class="text-sm text-muted truncate">
             {{ post.description }}
           </p>

@@ -7,6 +7,7 @@ import imageCompression from 'browser-image-compression'
 import { getDate, getMonth, getYear } from 'date-fns'
 import { MdEditor, config as MdEditorConfig } from 'md-editor-v3'
 import { POST_STATUS } from '~/constants/post-status.constant'
+import { isShortFormPost, plainLength, SHORT_FORM_LIMIT } from '~/utils/short-form'
 import 'md-editor-v3/lib/style.css'
 
 const props = defineProps<{ data?: PostListItem }>()
@@ -50,6 +51,17 @@ const enteredContent = ref(props.data?.content ?? '')
 const status = ref<POST_STATUS>(props.data?.status ?? POST_STATUS.DRAFT)
 const lastSavedSnapshot = ref('')
 
+const isShortForm = computed(() =>
+  isShortFormPost(enteredTags.value, enteredPublishedAt.value.toString()),
+)
+const contentLength = computed(() => plainLength(enteredContent.value))
+const isOverShortFormLimit = computed(
+  () => isShortForm.value && contentLength.value > SHORT_FORM_LIMIT,
+)
+const blocksPublishing = computed(
+  () => isOverShortFormLimit.value && status.value === POST_STATUS.PUBLISHED,
+)
+
 const formattedLastSavedAt = computed(() => {
   if (!lastSavedAt.value) {
     return ''
@@ -65,6 +77,10 @@ const formattedLastSavedAt = computed(() => {
 const saveStatusMessage = computed(() => {
   if (submitError.value) {
     return '저장에 실패했습니다. 내용을 확인한 뒤 다시 시도해 주세요.'
+  }
+
+  if (blocksPublishing.value) {
+    return `짧은 글은 ${SHORT_FORM_LIMIT}자까지 발행할 수 있습니다. 줄이거나 draft로 바꾸면 다시 저장됩니다.`
   }
 
   if (isAutoSaving.value) {
@@ -184,6 +200,10 @@ async function savePost(options?: { navigateOnSuccess?: boolean; isAutoSave?: bo
   }
 
   if (!postId.value && isAutoSaveRequest && !hasMeaningfulContent()) {
+    return false
+  }
+
+  if (blocksPublishing.value) {
     return false
   }
 
@@ -360,7 +380,10 @@ onBeforeUnmount(() => {
 
     <div class="space-y-4">
       <UiFormField label="TITLE">
-        <UiInput v-model="enteredTitle" />
+        <UiInput
+          v-model="enteredTitle"
+          :placeholder="isShortForm ? '짧은 글은 제목 없이 써도 됩니다' : undefined"
+        />
       </UiFormField>
 
       <UiFormField label="DESCRIPTION">
@@ -390,12 +413,26 @@ onBeforeUnmount(() => {
       </UiFormField>
 
       <div>
-        <UiButton color="primary" :loading="isSaving" @click="handleSubmitPost">
+        <UiButton
+          color="primary"
+          :loading="isSaving"
+          :disabled="blocksPublishing"
+          @click="handleSubmitPost"
+        >
           {{ postId ? 'SAVE & EXIT' : 'CREATE & EXIT' }}
         </UiButton>
       </div>
     </div>
 
-    <MdEditor v-model="enteredContent" language="ko-KR" @on-upload-img="handleUploadImage" />
+    <div class="space-y-2">
+      <MdEditor v-model="enteredContent" language="ko-KR" @on-upload-img="handleUploadImage" />
+      <p
+        v-if="isShortForm"
+        class="text-right text-sm tabular-nums"
+        :class="isOverShortFormLimit ? 'font-semibold text-error' : 'text-muted'"
+      >
+        {{ contentLength }} / {{ SHORT_FORM_LIMIT }}
+      </p>
+    </div>
   </div>
 </template>
