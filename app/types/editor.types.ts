@@ -13,6 +13,8 @@ export interface PostListItem {
   tags: Tag[]
   content: string
   status: POST_STATUS
+  // /admin/posts 목록만 채우는 본문 앞부분(마크다운 원문, 최대 300자)
+  excerpt?: string
 }
 
 export interface TagWithCategory {

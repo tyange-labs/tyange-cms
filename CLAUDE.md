@@ -27,6 +27,8 @@ lovelog(lovelog.tyange.com)는 `general` 카테고리의 `love`/`lovelog` 태그
 - 200자를 넘기면 **published 상태로는 저장하지 않는다** (자동 저장·SAVE 버튼 모두). draft는 그대로 자동 저장돼
   쓰던 글을 잃지 않는다.
 - 짧은 글은 제목 없이 쓴다. 제목이 비어 있으면 포스트 목록에 "제목 없음"으로 표시한다.
+- 포스트 목록(`/managing-blog`)은 제목 아래에 본문 앞부분을 3줄(`line-clamp-3`) 보여준다. cms-api
+  `/admin/posts`가 주는 `excerpt`(마크다운 원문 300자)를 `plainText`로 걷어내고 공백을 한 칸으로 접는다.
 
 기준일·글자 수·태그 조건은 lovelog `src/lib/timeline.ts`·`src/lib/cms.ts`와 각자 들고 있으니 **함께 고친다.**
 
@@ -62,7 +64,7 @@ Authorization 헤더를 그대로 실어 cms-api의 `GET /admin/wedding/guests`�
 - 결과적으로 Tailscale만 켜져 있으면 약 1년간 재로그인 없이 CMS에 바로 들어간다. 네트워크
   차단은 Tailscale이 하니까 앱 세션은 오래 살려도 된다는 전제.
 - e2e(`tests/playwright/dashboard-layout.spec.ts`)는 `auth` 쿠키에 `{ isAuth, accessToken,
-  userRole }` JSON을 직접 주입해서 로그인 화면을 건너뛴다.
+userRole }` JSON을 직접 주입해서 로그인 화면을 건너뛴다.
 
 ### 접근 제한 (Tailscale)
 

@@ -3,6 +3,7 @@ import type { PostListItem } from '~/types/editor.types'
 import type { CMSResponse } from '~/types/response.types'
 import { Inbox, Trash } from 'lucide-vue-next'
 import { handleUnauthorizedError, useAuthHeaders } from '~/composables/useAuthenticatedApi'
+import { plainText } from '~/utils/short-form'
 
 definePageMeta({
   layout: 'default',
@@ -72,6 +73,11 @@ watch(
 )
 
 const postList = computed(() => data.value?.data?.posts ?? [])
+
+// 제목만으로는 구분이 안 되는 글(특히 제목 없는 짧은 글)이 많아 본문 앞부분을 몇 줄 보여준다.
+function excerptOf(post: PostListItem) {
+  return plainText(post.excerpt ?? '').replace(/\s+/g, ' ')
+}
 const isLoading = computed(() => status.value === 'pending')
 const loadErrorMessage = computed(() =>
   error.value ? getErrorMessage(error.value, '포스트 목록을 불러오지 못했습니다.') : '',
@@ -140,7 +146,10 @@ async function handleDeletePost(postId: string) {
             {{ post.title }}
           </h2>
           <h2 v-else class="font-semibold italic text-muted">제목 없음</h2>
-          <p class="text-sm text-muted truncate">
+          <p v-if="excerptOf(post)" class="text-sm line-clamp-3 break-keep wrap-anywhere">
+            {{ excerptOf(post) }}
+          </p>
+          <p v-if="post.description" class="text-sm text-muted truncate">
             {{ post.description }}
           </p>
           <div class="flex items-center gap-4 text-xs text-muted">

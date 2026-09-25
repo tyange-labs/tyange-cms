@@ -15,9 +15,9 @@ export function isShortFormPost(tags: Tag[], publishedAt: string) {
   )
 }
 
-// 마크다운 문법을 걷어낸 글자 수. lovelog가 짧은 글로 보여줄지 가를 때와 같은 방식으로 센다.
-export function plainLength(markdown: string) {
-  const stripped = markdown
+// 마크다운 문법을 걷어낸 글자. lovelog가 짧은 글로 보여줄지 가를 때와 같은 방식으로 걷어낸다.
+export function plainText(markdown: string) {
+  return markdown
     .replace(/!\[[^\]]*\]\([^)]*\)/g, '')
     .replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/^#{1,6}\s+/gm, '')
@@ -26,6 +26,8 @@ export function plainLength(markdown: string) {
     .replace(/^\d+\.\s+/gm, '')
     .replace(/[`*_~]/g, '')
     .trim()
+}
 
-  return [...stripped].length
+export function plainLength(markdown: string) {
+  return [...plainText(markdown)].length
 }
