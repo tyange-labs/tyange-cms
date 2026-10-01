@@ -31,6 +31,11 @@ const items = computed<NavItem[]>(() =>
           active: route.path === '/portfolio',
         },
         {
+          label: 'PDF 포트폴리오',
+          to: '/portfolio-pdf',
+          active: route.path.startsWith('/portfolio-pdf'),
+        },
+        {
           label: '하객 명단',
           to: '/wedding-guests',
           active: route.path === '/wedding-guests',

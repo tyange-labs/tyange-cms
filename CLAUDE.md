@@ -46,6 +46,32 @@ Authorization 헤더를 그대로 실어 cms-api의 `GET /admin/wedding/guests`�
   `Z`를 붙여 읽은 뒤 `Asia/Seoul`로 옮겨 표시한다.
 - 시간대별 집계는 데이터에 없는 칸도 0으로 보여준다. 비어 있는 시간대가 보여야 쓸모가 있다.
 
+## PDF 포트폴리오 (`/portfolio-pdf`)
+
+포트폴리오 PDF(1920×1080 슬라이드)를 만들고 편집하고 내려받는 관리자 페이지 (2026-10).
+
+- **데이터**: cms-api의 `portfolio_pdf` 포트폴리오 섹션(`GET/PUT /portfolio/sections/portfolio_pdf`, 관리자 전용).
+  `{ theme: { accent, accent_dark }, pages: [{ id, template, dark, data }] }`. 공개 `GET /portfolio`
+  응답에는 섞이지 않는다. 백엔드는 페이지 `data` 구조를 검증하지 않고(최대 40장·256KB·id 중복만 확인),
+  구조는 `app/types/portfolio-pdf.types.ts`와 `app/utils/portfolio-pdf-schema.ts`가 정의한다. 저장된 적이 없으면
+  `utils/portfolio-pdf-default.ts`의 기본 문서(현재 10장)에서 시작한다.
+- **템플릿 10종**(cover/timeline/compare/cards/layers/hub/showcase/project/skills/closing).
+  새 템플릿은 ① `portfolio-pdf-schema.ts`에 스키마·기본값 ② `components/portfolio-pdf/PortfolioPdfPageView.vue`에 렌더링
+  분기 ③ `assets/css/portfolio-pdf.css`(모든 클래스 `rs-` 접두사)를 더하면 편집 폼은 스키마로 자동 생성된다
+  (`PortfolioPdfFieldEditor.vue`, 재귀 컴포넌트). 문자열 목록은 textarea+줄바꿈 split 대신 입력칸 목록으로
+  둔다(포트폴리오 에디터의 마지막 줄 Enter 문제를 피하려는 선택).
+- **PDF 생성**: 서버가 아니라 브라우저 인쇄. `/portfolio-pdf/print`가 모든 페이지를 쌓아 `window.print()`를 연다
+  (`@page { size: 1920px 1080px }`, 대상: PDF로 저장). 미리보기와 인쇄가 같은 `PortfolioPdfPageView`를 써서
+  화면에서 본 것이 PDF가 된다. `?noprint=1`이면 인쇄 창을 열지 않는다(테스트용). Lightsail(RAM 1.9GB)에
+  Chromium을 올리지 않으려고 고른 방식이다.
+- **글꼴**: `public/portfolio-pdf/fonts/`의 Pretendard subset(한글 일부만 포함)과 Monaspace Neon(라틴 전용).
+  subset에 없는 글자는 기본 글꼴로 대체돼 PDF 모양이 달라질 수 있다.
+- **이미지**: 기본 문서의 스크린샷은 `public/portfolio-pdf/*.jpg`(청첩장 원본 캡처 포함). 편집기의 이미지 칸은
+  URL 입력 또는 업로드(`/api/post/upload-image?id=portfolio_pdf`, 응답 경로에 `tyangeCmsApiBaseProd`를 붙인다).
+- **주의**: `main.css`가 `* { font-family }`를 걸고 있어서 `.rs-page`에서 글꼴을 다시 덮는다. 로컬 개발 중
+  lovelog dev 서버(포트 3000)와 겹치면 `localhost`가 IPv6로 그쪽을 가리키니 `127.0.0.1:3000`으로 접속한다.
+- 테스트: `tests/playwright/portfolio-pdf.spec.ts`(편집기 추가·순서·저장, 인쇄 화면).
+
 ## 로그인
 
 **ID / 비밀번호 하나뿐이다.** Google 로그인은 양쪽 다 완전히 제거됐다 (CMS: 화면 / `/api/login/google`
@@ -104,6 +130,7 @@ ID/비번 로그인은 **앱 세션 계층**이고, 그 위에 **네트워크 �
 
 - 운영 중
 - 하객 명단 페이지 추가 (lovelog RSVP 조회)
+- PDF 포트폴리오 편집·다운로드 페이지 추가 (`/portfolio-pdf`, 2026-10). 자세한 건 `## PDF 포트폴리오` 참고
 - Google 로그인 제거, ID/비밀번호 로그인만 사용
 - refresh token 제거, access token exp 1년 + `auth` 쿠키 maxAge 1년으로 세션 장기 유지 (2026-09).
   자세한 건 `## 로그인 > 세션 유지` 참고
