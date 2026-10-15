@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { LogOut } from 'lucide-vue-next'
+import { KeyRound, LogOut } from 'lucide-vue-next'
 
 interface NavItem {
   label: string
@@ -55,7 +55,19 @@ async function handleLogout() {
     <UiNavMenu v-if="items.length" :items="items" />
     <template #right>
       <div data-testid="dashboard-header-actions" class="flex items-center gap-3">
-        <span class="text-sm text-muted">{{ authStore.userRole ?? 'unknown' }}</span>
+        <span v-if="!isAdmin" class="text-sm text-muted">{{
+          authStore.userRole ?? 'unknown'
+        }}</span>
+        <UiButton
+          v-if="isAdmin"
+          to="/api-keys"
+          color="neutral"
+          :variant="route.path === '/api-keys' ? 'soft' : 'ghost'"
+          :icon="KeyRound"
+          aria-label="API 키"
+          title="API 키"
+          data-testid="dashboard-header-api-keys"
+        />
         <UiButton color="neutral" variant="ghost" :icon="LogOut" @click="handleLogout">
           로그아웃
         </UiButton>

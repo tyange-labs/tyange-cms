@@ -16,6 +16,7 @@ Nuxt 4 + Vue 3. bun 사용.
 
 - 백엔드: `tyange-cms-api` (Rust + Poem)
 - API 변경 시 반드시 tyange-cms와 동기화 필요
+- **글 작업·동기화·배포 확인은 CLI `tyange`(`tyange-cli`)로 한다** — 직접 HTTP 요청이나 브라우저 조작 대신. `tyange cms posts|get|new|update|publish|draft|delete|sync`, `tyange ci --watch`. 쓰는 법과 설정은 `tyange-cli/CLAUDE.md`. API 응답·인증 방식을 바꾸면 그 CLI(`src/cms.rs`)도 같이 고친다.
 
 ## lovelog 짧은 글 (`app/utils/short-form.ts`)
 
@@ -138,6 +139,13 @@ ID/비번 로그인은 **앱 세션 계층**이고, 그 위에 **네트워크 �
   `https://cms.tail7710bc.ts.net` (tailnet 전용), 공개 `cms.tyange.com` vhost 제거됨. 자세한 건 `## 로그인` 절 참고
 - 포트폴리오 편집은 섹션별 저장(`PUT /portfolio/sections/:section_key`, 섹션 키: meta / identity / intro / featured_projects / career) 사용, 최초 생성만 전체 문서 PUT
 - API에서 가계부/1:1 매칭/RSS/API Key 인증 제거됨 — CMS는 포스트/포트폴리오/태그/이미지 운영에 집중
+- **API 키 화면 (`/api-keys`)** (2026-10): `tyange` CLI용 개인 액세스 토큰을 만들고 폐기한다(위 줄에서 걷어냈던 API Key를 CLI 때문에 **다시 도입**했다. 자세한 건 cms-api CLAUDE.md).
+  `server/api/api-keys/{index.get,index.post,revoke.delete}.ts`가 Authorization 헤더를 그대로 실어 cms-api `/admin/api-keys`로 넘긴다. 키 원문은 **만든 직후 응답에서만**
+  보여 주고(`createdKey`, 화면을 벗어나면 사라짐) 목록에는 앞 16자(`tyk_`+12자)만 나온다. 폐기는 같은 버튼을 두 번 눌러야 실행한다(브라우저 `confirm`은 쓰지 않는다).
+  헤더에서는 메뉴 항목 대신 **열쇠 아이콘 버튼**(오른쪽 위)으로 들어간다 — 메뉴가 5개에서 이미 `max-w-3xl` 헤더가 꽉 차서 6번째를 넣으면 오른쪽 글자와 겹쳤다.
+  같은 이유로 관리자에게는 역할 글자(`admin`)를 숨긴다(일반 사용자에게는 그대로 보인다). 키로는 키를 만들 수 없어서 이 화면은 로그인 JWT로만 동작한다.
+  `UiAlert`는 슬롯을 렌더링하지 않고 `color`는 error/success/warning/neutral만 받는다 — 본문에 버튼 같은 걸 넣어야 하면 직접 박스를 만든다.
+  테스트: `tests/playwright/api-keys.spec.ts`(목록, 발급 후 한 번만 노출, 두 번 눌러 폐기).
 - `@nuxt/ui` 제거하고 Reka UI 기반 자체 컴포넌트로 전면 교체, Nuxt 4.5.2로 업그레이드 (2026-09)
 - ESLint(`@antfu/eslint-config`) 제거, `oxlint`/`oxfmt`로 전환 (2026-09)
 - `ssr: false` — 앱 전체 SPA (2026-09). Tailscale로 가둔 인증 전용 도구라 SSR 이득이 없고,
