@@ -8,7 +8,6 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: deploy on aws
 
     steps:
       - name: Checkout
