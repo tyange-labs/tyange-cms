@@ -8,6 +8,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: deploy on aws
 
     steps:
       - name: Checkout
@@ -23,16 +24,6 @@ jobs:
 
       - name: Build
         run: bun run build
-
-      - name: Debug secret lengths
-        run: |
-          echo "HOST len: ${#HOST}"
-          echo "USERNAME len: ${#USERNAME}"
-          echo "SSH_PRIVATE_KEY len: ${#SSH_PRIVATE_KEY}"
-        env:
-          HOST: ${{ secrets.HOST }}
-          USERNAME: ${{ secrets.USERNAME }}
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Deploy files via SCP
         uses: appleboy/scp-action@v0.1.7
