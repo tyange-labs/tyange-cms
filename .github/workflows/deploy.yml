@@ -30,7 +30,7 @@ jobs:
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: ".output,ecosystem.config.js"
           target: ${{ vars.DEPLOY_PATH }}
           strip_components: 0
@@ -42,7 +42,7 @@ jobs:
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.LIGHTSAIL_SSH_KEY }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             cd ${{ vars.DEPLOY_PATH }}
             export NUXT_PUBLIC_TYANGE_CMS_API_BASE='${{ vars.NUXT_PUBLIC_TYANGE_CMS_API_BASE }}'
